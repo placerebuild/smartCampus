@@ -1,0 +1,16 @@
+{
+  "rewrites": [
+    { "source": "/", "destination": "/html/index.html" },
+    { "source": "/index.html", "destination": "/html/index.html" },
+    { "source": "/dashboard.html", "destination": "/html/index.html" },
+    { "source": "/devices.html", "destination": "/html/devices.html" },
+    { "source": "/topology.html", "destination": "/html/topology.html" },
+    { "source": "/alerts.html", "destination": "/html/alerts.html" },
+    { "source": "/reports.html", "destination": "/html/reports.html" },
+    { "source": "/profile.html", "destination": "/html/profile.html" },
+    { "source": "/settings.html", "destination": "/html/settings.html" },
+    { "source": "/login.html", "destination": "/html/login.html" },
+    { "source": "/signup.html", "destination": "/html/signup.html" },
+    { "source": "/mainpage.html", "destination": "/html/mainpage.html" }
+  ]
+}
