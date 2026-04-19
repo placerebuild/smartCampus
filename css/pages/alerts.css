@@ -1,4 +1,4 @@
-:root {
+﻿:root {
     --sidebar-width: 272px;
     --text-900: #0f2338;
     --text-700: #435972;
@@ -23,13 +23,13 @@ body {
     min-height: 100%;
 }
 
-body.app-shell {
+body.sidebar-layout {
     font-family: 'IBM Plex Sans', sans-serif;
     color: var(--text-900);
     background:
-        radial-gradient(circle at 12% 10%, #d7ecff 0%, rgba(215, 236, 255, 0) 34%),
-        radial-gradient(circle at 86% 14%, #ffe7cc 0%, rgba(255, 231, 204, 0) 38%),
-        linear-gradient(160deg, #f4f8ff 0%, #edf3fa 100%);
+        radial-gradient(circle at 12% 10%, #d7ffd7 0%, rgba(215, 255, 215, 0) 34%),
+        radial-gradient(circle at 86% 14%, #fffae6 0%, rgba(255, 250, 230, 0) 38%),
+        linear-gradient(160deg, #f4fff4 0%, #edfbed 100%);
     overflow-x: hidden;
 }
 
@@ -39,8 +39,8 @@ body.app-shell {
     top: 0;
     left: 0;
     width: var(--sidebar-width);
-    background: linear-gradient(160deg, #0c2239 0%, #114266 48%, #0a314d 100%);
-    color: #eef6ff;
+    background: linear-gradient(160deg, #082d16 0%, #0c4d25 48%, #05220f 100%);
+    color: #effcf3;
     padding-top: 1.2rem;
     border-right: 1px solid rgba(255, 255, 255, 0.08);
     box-shadow: 0 20px 42px rgba(5, 19, 35, 0.45);
@@ -55,17 +55,17 @@ body.app-shell {
 }
 
 .brand-icon {
-    color: #4ce0da;
+    color: #6ef0bd;
     margin-right: 0.25rem;
 }
 
 .sidebar-subtitle {
-    color: rgba(224, 238, 255, 0.68);
+    color: rgba(224, 255, 235, 0.68);
     letter-spacing: 0.04em;
 }
 
 .sidebar .nav-link {
-    color: #d8e6f7;
+    color: #d8f7e3;
     padding: 0.72rem 0.95rem;
     border-radius: 12px;
     margin-bottom: 0.35rem;
@@ -88,8 +88,8 @@ body.app-shell {
 
 .sidebar .nav-link.active {
     color: #ffffff;
-    background: linear-gradient(90deg, #1f7ae0 0%, #12b3c7 100%);
-    box-shadow: 0 12px 22px rgba(13, 78, 136, 0.38);
+    background: linear-gradient(90deg, #149358 0%, #1ecc83 100%);
+    box-shadow: 0 12px 22px rgba(13, 102, 58, 0.38);
 }
 
 .sidebar .nav-link.text-danger {
@@ -200,8 +200,8 @@ body.app-shell {
 
 .hero-panel {
     border-radius: 20px;
-    background: linear-gradient(120deg, #0b4669 0%, #117a73 52%, #1b975d 100%);
-    color: #f6fbff;
+    background: linear-gradient(120deg, #0c5729 0%, #158a47 52%, #1db862 100%);
+    color: #f5fffa;
     padding: 1.4rem 1.55rem;
     display: flex;
     align-items: center;
@@ -326,7 +326,7 @@ body.app-shell {
 }
 
 .stat-icon-primary {
-    background: linear-gradient(145deg, #1f7ae0 0%, #4aa7ff 100%);
+    background: linear-gradient(145deg, #129355 0%, #30ca7f 100%);
 }
 
 .stat-icon-success {
@@ -389,8 +389,8 @@ code {
 
 .btn-primary {
     border: 0;
-    background: linear-gradient(95deg, #1f7ae0 0%, #12b3c7 100%);
-    box-shadow: 0 10px 20px rgba(25, 97, 170, 0.24);
+    background: linear-gradient(95deg, #129355 0%, #1ecc83 100%);
+    box-shadow: 0 10px 20px rgba(18, 128, 77, 0.24);
     border-radius: 11px;
     font-weight: 600;
 }
@@ -514,11 +514,11 @@ code {
         transform: translateX(-100%);
     }
 
-    body.app-shell.sidebar-open .sidebar {
+    body.sidebar-layout.sidebar-open .sidebar {
         transform: translateX(0);
     }
 
-    body.app-shell.sidebar-open .sidebar-overlay {
+    body.sidebar-layout.sidebar-open .sidebar-overlay {
         opacity: 1;
         pointer-events: auto;
     }
@@ -564,3 +564,5 @@ code {
         min-height: auto;
     }
 }
+
+

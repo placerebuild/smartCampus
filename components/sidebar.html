@@ -1,0 +1,30 @@
+<nav class="sidebar">
+    <div class="px-3 mb-4 mt-2 text-center">
+        <a href="login.html" title="Go to Login">
+            <img src="../images/transparent_logo.png" alt="DNSC Logo Placeholder" class="img-fluid mb-3"
+                style="max-height: 140px; object-fit: contain; cursor: pointer;">
+        </a>
+        <h4 class="navbar-brand text-white mb-1"><span class="brand-icon"><i
+                    class="fas fa-satellite-dish"></i></span> SmartCampus SecureNet</h4>
+        <p class="small mb-0 sidebar-subtitle">Network Monitoring</p>
+    </div>
+    <ul class="nav flex-column px-2">
+        <li class="nav-item"><a href="index.html" class="nav-link"><i class="fas fa-tachometer-alt me-2"></i>
+                Dashboard</a></li>
+        <li class="nav-item"><a href="devices.html" class="nav-link"><i class="fas fa-server me-2"></i> Devices</a>
+        </li>
+        <li class="nav-item"><a href="topology.html" class="nav-link"><i class="fas fa-project-diagram me-2"></i>
+                Topology Map</a></li>
+        <li class="nav-item"><a href="alerts.html" class="nav-link"><i class="fas fa-bell me-2"></i> Alerts <span
+                    class="badge bg-danger ms-2" id="alert-count"></span></a></li>
+        <li class="nav-item"><a href="reports.html" class="nav-link"><i class="fas fa-chart-bar me-2"></i>
+                Reports</a></li>
+        <li class="nav-item"><a href="profile.html" class="nav-link"><i class="fas fa-user me-2"></i> Profile</a>
+        </li>
+        <li class="nav-item"><a href="settings.html" class="nav-link"><i class="fas fa-gear me-2"></i> Settings</a>
+        </li>
+        <li class="nav-item mt-4"><a href="#" class="nav-link text-danger" onclick="logout()"><i
+                    class="fas fa-sign-out-alt me-2"></i> Logout</a></li>
+    </ul>
+</nav>
+<div class="sidebar-overlay" onclick="toggleSidebar()"></div>

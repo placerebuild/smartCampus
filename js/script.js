@@ -1,54 +1,11 @@
-function showPage(page) {
-    const contentArea = document.getElementById('content-area');
-    if (!contentArea) return;
-
-    const pageTitles = {
-        dashboard: 'Dashboard',
-        devices: 'Devices',
-        topology: 'Topology Map',
-        alerts: 'Alerts',
-        reports: 'Reports',
-        profile: 'Profile',
-        settings: 'Settings'
-    };
-
-    document.querySelectorAll('#content-area > div').forEach(div => div.classList.add('d-none'));
-
-    const pageElement = document.getElementById(page + '-page');
-    if (pageElement) pageElement.classList.remove('d-none');
-
-    const pageTitle = document.getElementById('page-title');
-    if (pageTitle) pageTitle.textContent = pageTitles[page] || 'Dashboard';
-
-    document.querySelectorAll('.sidebar .nav-link').forEach(link => link.classList.remove('active'));
-    const activeLink = document.querySelector('.sidebar .nav-link[data-page="' + page + '"]');
-    if (activeLink) activeLink.classList.add('active');
-
-    if (window.innerWidth < 992) {
-        document.body.classList.remove('sidebar-open');
-    }
-
-    if (page === 'topology' && networkInstance) {
-        setTimeout(() => {
-            networkInstance.resize();
-            networkInstance.fit(networkInstance.elements(), 28);
-        }, 140);
-    }
-}
-
-const dummyDevices = [
-    {name: "SW-CORE-01", type: "Switch", ip: "192.168.1.10", location: "IC Building - Floor 2", status: "Online", lastSeen: "2 min ago"},
-    {name: "ROUTER-GW", type: "Router", ip: "192.168.1.1", location: "Main Server Room", status: "Online", lastSeen: "1 min ago"},
-    {name: "AP-ENG-03", type: "Wi-Fi AP", ip: "192.168.2.45", location: "IC Building - Floor 2", status: "Offline", lastSeen: "18 min ago"},
-    {name: "SW-LIB-02", type: "Switch", ip: "192.168.3.22", location: "IC Building - Floor 1", status: "Online", lastSeen: "5 min ago"}
-];
+let devicesData = [];
 
 function populateDevicesTable() {
     const tbody = document.querySelector('#devices-table tbody');
     if (!tbody) return;
 
     tbody.innerHTML = '';
-    dummyDevices.forEach(dev => {
+    devicesData.forEach(dev => {
         const statusHTML = dev.status === 'Online'
             ? `<span class="text-success"><i class="fas fa-circle"></i> Online</span>`
             : `<span class="text-danger"><i class="fas fa-circle"></i> Offline</span>`;
@@ -66,17 +23,21 @@ function populateDevicesTable() {
     });
 }
 
-const dummyAlerts = [
-    {time: "2025-03-31 17:42", device: "AP-ENG-03", issue: "Disconnected", severity: "High"},
-    {time: "2025-03-31 16:55", device: "SW-CORE-01", issue: "High CPU Usage", severity: "Medium"},
-    {time: "2025-03-31 15:10", device: "ROUTER-GW", issue: "Interface Down", severity: "High"}
-];
+let alertsData = [];
+
+function setDevicesData(devices) {
+    devicesData = Array.isArray(devices) ? devices : [];
+}
+
+function setAlertsData(alerts) {
+    alertsData = Array.isArray(alerts) ? alerts : [];
+}
 
 function populateRecentAlerts() {
     const list = document.getElementById('recent-alerts');
     if (!list) return;
 
-    list.innerHTML = dummyAlerts.map(a => `
+    list.innerHTML = alertsData.map(a => `
         <li class="list-group-item d-flex justify-content-between align-items-center">
             <div>
                 <strong>${a.device}</strong> - ${a.issue}
@@ -90,7 +51,7 @@ function populateAlertsTable() {
     const tbody = document.querySelector('#alerts-table tbody');
     if (!tbody) return;
 
-    tbody.innerHTML = dummyAlerts.map(a => `
+    tbody.innerHTML = alertsData.map(a => `
         <tr>
             <td>${a.time}</td>
             <td>${a.device}</td>
@@ -122,30 +83,9 @@ function populateReportsTable() {
 
 let networkInstance;
 
-const campusDevices = [
-    { id: 1, name: 'CORE-SW-01', type: 'Switch', ip: '192.168.1.10', building: 'IC Building', floor: 'Room A', status: 'Online', addedOn: '2026-04-06', x: -380, y: -170 },
-    { id: 2, name: 'ROUTER-GW', type: 'Router', ip: '192.168.1.1', building: 'IC Building', floor: 'Room A', status: 'Online', addedOn: '2026-04-06', x: -120, y: -170 },
-    { id: 3, name: 'FW-PERIMETER', type: 'Firewall', ip: '192.168.1.254', building: 'IC Building', floor: 'Room A', status: 'Warning', addedOn: '2026-04-07', x: 140, y: -170 },
-    { id: 4, name: 'SW-IT-02', type: 'Switch', ip: '192.168.10.2', building: 'IC Building', floor: 'Floor 2', status: 'Online', addedOn: '2026-04-08', x: -330, y: 0 },
-    { id: 5, name: 'AP-IT-2F', type: 'Wi-Fi AP', ip: '192.168.10.45', building: 'IC Building', floor: 'Floor 2', status: 'Online', addedOn: '2026-04-08', x: -110, y: 30 },
-    { id: 6, name: 'SW-ENG-01', type: 'Switch', ip: '192.168.20.2', building: 'IC Building', floor: 'Floor 1', status: 'Online', addedOn: '2026-04-09', x: 130, y: 10 },
-    { id: 7, name: 'AP-ENG-03', type: 'Wi-Fi AP', ip: '192.168.20.51', building: 'IC Building', floor: 'Floor 3', status: 'Offline', addedOn: '2026-04-10', x: 360, y: 35 },
-    { id: 8, name: 'SW-LIB-02', type: 'Switch', ip: '192.168.30.2', building: 'IC Building', floor: 'Floor 1', status: 'Online', addedOn: '2026-04-11', x: -40, y: 220 },
-    { id: 9, name: 'AP-LIB-1F', type: 'Wi-Fi AP', ip: '192.168.30.61', building: 'IC Building', floor: 'Floor 1', status: 'Online', addedOn: '2026-04-11', x: 190, y: 230 },
-    { id: 10, name: 'SW-ADMIN-01', type: 'Switch', ip: '192.168.40.2', building: 'IC Building', floor: 'Floor 1', status: 'Warning', addedOn: '2026-04-12', x: 410, y: 220 }
-];
+const campusDevices = [];
 
-const campusLinks = [
-    { id: 'l1', from: 1, to: 2, medium: 'Fiber', bandwidth: '10 Gbps', status: 'Online' },
-    { id: 'l2', from: 2, to: 3, medium: 'Ethernet', bandwidth: '10 Gbps', status: 'Online' },
-    { id: 'l3', from: 1, to: 4, medium: 'Fiber', bandwidth: '1 Gbps', status: 'Online' },
-    { id: 'l4', from: 4, to: 5, medium: 'Ethernet', bandwidth: '1 Gbps', status: 'Online' },
-    { id: 'l5', from: 1, to: 6, medium: 'Fiber', bandwidth: '1 Gbps', status: 'Online' },
-    { id: 'l6', from: 6, to: 7, medium: 'Ethernet', bandwidth: '1 Gbps', status: 'Degraded' },
-    { id: 'l7', from: 1, to: 8, medium: 'Fiber', bandwidth: '1 Gbps', status: 'Online' },
-    { id: 'l8', from: 8, to: 9, medium: 'Ethernet', bandwidth: '1 Gbps', status: 'Online' },
-    { id: 'l9', from: 1, to: 10, medium: 'Fiber', bandwidth: '1 Gbps', status: 'Degraded' }
-];
+const campusLinks = [];
 
 function statusColor(status) {
     if (status === 'Online') return '#22a55a';
@@ -366,7 +306,7 @@ function initTopology() {
         boxSelectionEnabled: false
     });
 
-    networkInstance.on('tap', 'node', function(evt) {
+    networkInstance.on('tap', 'node', function (evt) {
         renderSelectedDevice(Number(evt.target.id()));
     });
 
@@ -377,8 +317,8 @@ function initTopology() {
     if (buildingFilter) buildingFilter.addEventListener('change', refreshTopology);
     if (statusFilter) statusFilter.addEventListener('change', refreshTopology);
     if (resetButton) {
-        resetButton.addEventListener('click', function() {
-            if (buildingFilter) buildingFilter.value = 'IC Building';
+        resetButton.addEventListener('click', function () {
+            if (buildingFilter) buildingFilter.value = 'all';
             if (statusFilter) statusFilter.value = 'all';
             refreshTopology();
         });
@@ -448,20 +388,76 @@ function toggleSidebar() {
 }
 
 function logout() {
-    if (confirm('Logout?')) window.location.reload();
+    const existing = document.getElementById('logoutConfirmModal');
+    if (existing) existing.remove();
+
+    const modalHTML = `
+    <div class="modal fade" id="logoutConfirmModal" tabindex="-1" aria-labelledby="logoutConfirmLabel" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content" style="border:none; border-radius:16px; overflow:hidden; box-shadow:0 12px 40px rgba(0,0,0,.25);">
+          <div class="modal-body text-center px-4 pt-4 pb-2">
+            <div style="width:56px;height:56px;border-radius:50%;background:rgba(220,53,69,.12);display:inline-flex;align-items:center;justify-content:center;margin-bottom:16px;">
+              <i class="fas fa-sign-out-alt" style="font-size:24px;color:#dc3545;"></i>
+            </div>
+            <h5 class="fw-bold mb-2" id="logoutConfirmLabel" style="font-family:'Sora',sans-serif;">Sign Out</h5>
+            <p class="text-muted mb-0" style="font-size:.92rem;">Are you sure you want to log out of <strong>SmartCampus SecureNet</strong>?</p>
+          </div>
+          <div class="modal-footer border-0 justify-content-center gap-2 pb-4 pt-3">
+            <button type="button" class="btn px-4" data-bs-dismiss="modal"
+              style="border-radius:10px;font-weight:600;border:1.5px solid #dee2e6;background:#fff;color:#495057;">Cancel</button>
+            <button type="button" class="btn px-4" id="confirmLogoutBtn"
+              style="border-radius:10px;font-weight:600;background:linear-gradient(135deg,#dc3545,#b02a37);color:#fff;border:none;">Log Out</button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+
+    const modalEl = document.getElementById('logoutConfirmModal');
+    const bsModal = new bootstrap.Modal(modalEl, { backdrop: 'static' });
+
+    document.getElementById('confirmLogoutBtn').addEventListener('click', function () {
+        window.location.href = 'login.html';
+    });
+
+    modalEl.addEventListener('hidden.bs.modal', function () {
+        modalEl.remove();
+    });
+
+    bsModal.show();
 }
 
-window.onload = function() {
+async function loadSidebar() {
+    try {
+        const response = await fetch('../components/sidebar.html');
+        if (!response.ok) return;
+        const html = await response.text();
+        const container = document.getElementById('sidebar-container');
+        if (container) {
+            container.innerHTML = html;
+            const currentPath = window.location.pathname.split('/').pop() || 'index.html';
+            const links = container.querySelectorAll('.nav-link');
+            links.forEach(link => {
+                link.classList.remove('active');
+                if (link.getAttribute('href') === currentPath) {
+                    link.classList.add('active');
+                }
+            });
+        }
+    } catch (e) {
+        console.warn('Sidebar not loaded. Are you running a local server?', e);
+    }
+}
+
+window.onload = async function () {
+    await loadSidebar();
     populateDevicesTable();
     populateRecentAlerts();
     populateAlertsTable();
     populateReportsTable();
     createStatusChart();
     initTopology();
-
-    if (document.getElementById('content-area') && document.getElementById('dashboard-page')) {
-        showPage('dashboard');
-    }
 
     console.log('%cCampusNet UI layout loaded successfully!', 'color:#0d6efd; font-weight:bold');
 };
