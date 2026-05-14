@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 
 <head>
@@ -30,8 +30,8 @@
                 <div class="card panel-card p-4 text-center">
                     <img src="https://i.pinimg.com/736x/71/3b/91/713b91f71ff4f5c11366ec5a052bdb11.jpg"
                         class="rounded-circle mx-auto mb-3" width="96" alt="Administrator avatar">
-                    <h6 class="mb-1">Campus Net Admin</h6>
-                    <p class="text-muted mb-2">Network Operations Lead</p>
+                    <h6 class="mb-1" id="profileDisplayName">Loading...</h6>
+                    <p class="text-muted mb-2" id="profileDisplayRole">Loading...</p>
                     <span class="status-pill justify-content-center"><i class="fas fa-circle"></i> Active Session</span>
                 </div>
             </div>
@@ -39,15 +39,17 @@
                 <div class="card panel-card p-4">
                     <h6 class="section-title">Profile Information</h6>
                     <div class="row g-3">
-                        <div class="col-md-6"><label class="form-label">Full Name</label><input type="text"
-                                class="form-control" value="Campus Net Admin"></div>
+                        <div class="col-md-6"><label class="form-label">First Name</label><input type="text"
+                                class="form-control" id="profileFirstName" value=""></div>
+                        <div class="col-md-6"><label class="form-label">Last Name</label><input type="text"
+                                class="form-control" id="profileLastName" value=""></div>
                         <div class="col-md-6"><label class="form-label">Email</label><input type="email"
-                                class="form-control" value="admin@icbuilding.local"></div>
+                                class="form-control" id="profileEmail" value="" readonly disabled></div>
                         <div class="col-md-6"><label class="form-label">Contact Number</label><input type="text"
-                                class="form-control" value="+63 900 000 0000"></div>
+                                class="form-control" id="profileContact" value=""></div>
                         <div class="col-md-6"><label class="form-label">Role</label><input type="text"
-                                class="form-control" value="System Administrator"></div>
-                        <div class="col-12"><button class="btn btn-primary" type="button">Save Profile</button></div>
+                                class="form-control" id="profileRole" value="" readonly disabled></div>
+                        <div class="col-12"><button class="btn btn-primary" type="button" id="profileSaveBtn">Save Profile</button></div>
                     </div>
                 </div>
             </div>
@@ -57,6 +59,7 @@
     <script src="https://cdn.jsdelivr.net/npm/cytoscape@3.30.2/dist/cytoscape.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <script src="../js/script.js"></script>
+    <script type="module" src="../js/auth.js"></script>
 </body>
 
 </html>

@@ -1,4 +1,185 @@
 let devicesData = [];
+let deviceIdCounter = 1;
+
+function isValidIpAddress(value) {
+    if (typeof value !== 'string') return false;
+    const parts = value.trim().split('.');
+    if (parts.length !== 4) return false;
+    return parts.every(part => part !== '' && Number.isInteger(Number(part)) && Number(part) >= 0 && Number(part) <= 255);
+}
+
+function upsertDevice(device) {
+    const index = devicesData.findIndex(item => item.ip === device.ip);
+    if (index >= 0) {
+        const existing = devicesData[index];
+        devicesData[index] = {
+            ...existing,
+            ...device,
+            name: device.name || existing.name,
+            type: device.type || existing.type,
+            location: device.location || existing.location
+        };
+        return;
+    }
+
+    devicesData.unshift(device);
+}
+
+function setScanStatusTone(target, tone) {
+    if (!target) return;
+    target.className = `small ${tone}`;
+}
+
+function formatLastSeen(value) {
+    if (!value) return '';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return value;
+    return date.toLocaleString();
+}
+
+function applyDeviceResults(devices) {
+    if (!Array.isArray(devices)) return;
+    devicesData = devices.map(device => ({
+        ...device,
+        lastSeen: formatLastSeen(device.lastSeen)
+    }));
+    populateDevicesTable();
+}
+
+function initDeviceAutoRefresh() {
+    const table = document.getElementById('devices-table');
+    if (!table) return;
+
+    const deviceScanBase = window.DEVICE_SCAN_API_BASE || 'http://localhost:4000';
+    const resultsApi = window.DEVICE_SCAN_RESULTS_API || `${deviceScanBase}/api/scan/results`;
+    const refreshMs = Number(window.DEVICE_SCAN_REFRESH_MS || 15000);
+
+    const refresh = async () => {
+        try {
+            const response = await fetch(resultsApi, { cache: 'no-store' });
+            if (!response.ok) return;
+            const payload = await response.json();
+            applyDeviceResults(payload);
+        } catch (error) {
+            console.warn('Unable to fetch device scan results.', error);
+        }
+    };
+
+    refresh();
+    setInterval(refresh, refreshMs);
+}
+
+function initDeviceScanner() {
+    const form = document.getElementById('deviceScanForm');
+    if (!form) return;
+
+    const deviceScanBase = window.DEVICE_SCAN_API_BASE || 'http://localhost:4000';
+    const deviceScanApi = window.DEVICE_SCAN_API || `${deviceScanBase}/api/scan`;
+
+    const ipInput = document.getElementById('scanIp');
+    const nameInput = document.getElementById('scanName');
+    const typeInput = document.getElementById('scanType');
+    const locationInput = document.getElementById('scanLocation');
+    const statusMessage = document.getElementById('scanStatusMessage');
+    const submitBtn = document.getElementById('scanSubmitBtn');
+    const modalEl = document.getElementById('deviceScanModal');
+    const modalInstance = modalEl ? bootstrap.Modal.getOrCreateInstance(modalEl) : null;
+
+    if (modalEl) {
+        modalEl.addEventListener('hidden.bs.modal', () => {
+            if (statusMessage) {
+                statusMessage.textContent = 'Provide an IP address to add a device.';
+                setScanStatusTone(statusMessage, 'text-muted');
+            }
+            form.reset();
+        });
+    }
+
+    form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+
+        const ip = ipInput ? ipInput.value.trim() : '';
+        const name = nameInput ? nameInput.value.trim() : '';
+        const type = typeInput ? typeInput.value.trim() : 'Gateway';
+        const location = locationInput ? locationInput.value.trim() : '';
+
+        if (!isValidIpAddress(ip)) {
+            if (statusMessage) {
+                statusMessage.textContent = 'Enter a valid IPv4 address (example: 192.168.1.1).';
+                setScanStatusTone(statusMessage, 'text-danger');
+            }
+            return;
+        }
+
+        if (submitBtn) submitBtn.disabled = true;
+        if (statusMessage) {
+            statusMessage.textContent = 'Scanning device...';
+            setScanStatusTone(statusMessage, 'text-info');
+        }
+
+        try {
+            const response = await fetch(deviceScanApi, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    ip,
+                    name,
+                    type,
+                    location
+                })
+            });
+
+            if (!response.ok) {
+                let message = 'Scan failed. Please try again.';
+                try {
+                    const payload = await response.json();
+                    if (payload && payload.error) message = payload.error;
+                } catch (error) {
+                    message = response.statusText || message;
+                }
+
+                if (statusMessage) {
+                    statusMessage.textContent = message;
+                    setScanStatusTone(statusMessage, 'text-danger');
+                }
+                return;
+            }
+
+            const payload = await response.json();
+            const lastSeen = payload.lastSeen ? new Date(payload.lastSeen).toLocaleString() : new Date().toLocaleString();
+            const deviceRecord = {
+                id: payload.id || deviceIdCounter++,
+                name: payload.name || name || `Device ${ip}`,
+                type: payload.type || type || 'Other',
+                ip: payload.ip || ip,
+                location: payload.location || location || 'Unassigned',
+                status: payload.status || 'Unknown',
+                lastSeen: lastSeen
+            };
+
+            upsertDevice(deviceRecord);
+            populateDevicesTable();
+
+            if (statusMessage) {
+                statusMessage.textContent = 'Device added to inventory.';
+                setScanStatusTone(statusMessage, 'text-success');
+            }
+
+            if (modalInstance) {
+                modalInstance.hide();
+            }
+        } catch (error) {
+            if (statusMessage) {
+                statusMessage.textContent = 'Scan service unavailable. Is the server running?';
+                setScanStatusTone(statusMessage, 'text-danger');
+            }
+        } finally {
+            if (submitBtn) submitBtn.disabled = false;
+        }
+    });
+}
 
 function populateDevicesTable() {
     const tbody = document.querySelector('#devices-table tbody');
@@ -6,9 +187,14 @@ function populateDevicesTable() {
 
     tbody.innerHTML = '';
     devicesData.forEach(dev => {
-        const statusHTML = dev.status === 'Online'
-            ? `<span class="text-success"><i class="fas fa-circle"></i> Online</span>`
-            : `<span class="text-danger"><i class="fas fa-circle"></i> Offline</span>`;
+        const statusValue = dev.status || 'Unknown';
+        let statusHTML = `<span class="text-warning"><i class="fas fa-circle"></i> ${statusValue}</span>`;
+
+        if (statusValue === 'Online') {
+            statusHTML = `<span class="text-success"><i class="fas fa-circle"></i> Online</span>`;
+        } else if (statusValue === 'Offline') {
+            statusHTML = `<span class="text-danger"><i class="fas fa-circle"></i> Offline</span>`;
+        }
 
         tbody.innerHTML += `
             <tr>
@@ -27,6 +213,7 @@ let alertsData = [];
 
 function setDevicesData(devices) {
     devicesData = Array.isArray(devices) ? devices : [];
+    populateDevicesTable();
 }
 
 function setAlertsData(alerts) {
@@ -327,60 +514,158 @@ function initTopology() {
     renderSelectedDevice(null);
 }
 
-function createStatusChart() {
+let dashboardChartInstance = null;
+let dashboardRefreshTimer = null;
+
+function createStatusChart(onlineCount, offlineCount, unknownCount) {
     const canvas = document.getElementById('statusChart');
     if (!canvas) return;
 
-    const devicesPerDate = campusDevices.reduce((acc, device) => {
-        acc[device.addedOn] = (acc[device.addedOn] || 0) + 1;
-        return acc;
-    }, {});
+    const total = onlineCount + offlineCount + unknownCount;
 
-    const sortedDates = Object.keys(devicesPerDate).sort();
-    const labels = [];
-    const totals = [];
-    let runningTotal = 0;
+    if (dashboardChartInstance) {
+        dashboardChartInstance.data.datasets[0].data = [onlineCount, offlineCount, unknownCount];
+        dashboardChartInstance.options.plugins.title.text = `${total} Total Device${total !== 1 ? 's' : ''}`;
+        dashboardChartInstance.update();
+        return;
+    }
 
-    sortedDates.forEach(date => {
-        runningTotal += devicesPerDate[date];
-        labels.push(new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
-        totals.push(runningTotal);
-    });
-
-    new Chart(canvas, {
-        type: 'line',
+    dashboardChartInstance = new Chart(canvas, {
+        type: 'doughnut',
         data: {
-            labels,
+            labels: ['Online', 'Offline', 'Unknown'],
             datasets: [{
-                data: totals,
-                borderColor: '#1f7ae0',
-                backgroundColor: 'rgba(31, 122, 224, 0.18)',
-                fill: true,
-                tension: 0.35,
-                pointRadius: 5,
-                pointHoverRadius: 6
+                data: [onlineCount, offlineCount, unknownCount],
+                backgroundColor: [
+                    'rgba(24,163,104,0.85)',
+                    'rgba(222,91,84,0.85)',
+                    'rgba(240,154,53,0.85)'
+                ],
+                borderColor: [
+                    '#18a368',
+                    '#de5b54',
+                    '#f09a35'
+                ],
+                borderWidth: 2,
+                hoverOffset: 8,
+                borderRadius: 4,
+                spacing: 2
             }]
         },
         options: {
             responsive: true,
+            cutout: '62%',
             plugins: {
-                legend: {
-                    display: false
-                }
-            },
-            scales: {
-                x: {
-                    grid: { display: false },
-                    ticks: { color: '#4f6681', font: { weight: 600 } }
+                title: {
+                    display: true,
+                    text: `${total} Total Device${total !== 1 ? 's' : ''}`,
+                    font: { family: "'Sora', sans-serif", size: 15, weight: 700 },
+                    color: '#122f4b',
+                    padding: { bottom: 14 }
                 },
-                y: {
-                    beginAtZero: true,
-                    grid: { color: 'rgba(109, 143, 180, 0.15)' },
-                    ticks: { color: '#5c7591', precision: 0 }
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        usePointStyle: true,
+                        pointStyle: 'circle',
+                        padding: 18,
+                        font: { family: "'IBM Plex Sans', sans-serif", size: 13, weight: 600 },
+                        color: '#435972'
+                    }
+                },
+                tooltip: {
+                    backgroundColor: 'rgba(15,35,56,0.92)',
+                    titleFont: { family: "'Sora', sans-serif", weight: 700 },
+                    bodyFont: { family: "'IBM Plex Sans', sans-serif" },
+                    cornerRadius: 10,
+                    padding: 12,
+                    callbacks: {
+                        label: function(context) {
+                            const value = context.parsed;
+                            const pct = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
+                            return ` ${context.label}: ${value} (${pct}%)`;
+                        }
+                    }
                 }
             }
         }
     });
+}
+
+function populateDashboardAlerts(devices) {
+    const list = document.getElementById('recent-alerts');
+    if (!list) return;
+
+    const offlineDevices = devices.filter(d => d.status === 'Offline');
+    const alertsEl = document.getElementById('alerts-today');
+
+    if (alertsEl) {
+        alertsEl.textContent = offlineDevices.length;
+    }
+
+    if (offlineDevices.length === 0) {
+        list.innerHTML = `
+            <li class="list-group-item d-flex align-items-center gap-2" style="background:transparent;border-color:#e5eef8;padding-left:0;">
+                <i class="fas fa-check-circle text-success"></i>
+                <span class="text-muted">All devices are online. No alerts.</span>
+            </li>`;
+        return;
+    }
+
+    list.innerHTML = offlineDevices.slice(0, 8).map(d => {
+        const time = d.lastSeen ? d.lastSeen : 'Unknown';
+        return `
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+            <div>
+                <strong>${d.name || d.ip}</strong> - Device unreachable
+                <br><small class="text-muted">${time}</small>
+            </div>
+            <span class="badge bg-danger">Offline</span>
+        </li>`;
+    }).join('');
+}
+
+async function fetchDashboardData() {
+    const deviceScanBase = window.DEVICE_SCAN_API_BASE || 'http://localhost:4000';
+    const resultsApi = window.DEVICE_SCAN_RESULTS_API || `${deviceScanBase}/api/scan/results`;
+
+    try {
+        const response = await fetch(resultsApi, { cache: 'no-store' });
+        if (!response.ok) return;
+        const devices = await response.json();
+        if (!Array.isArray(devices)) return;
+
+        const total = devices.length;
+        const online = devices.filter(d => d.status === 'Online').length;
+        const offline = devices.filter(d => d.status === 'Offline').length;
+        const unknown = total - online - offline;
+
+        const totalEl = document.getElementById('total-devices');
+        const onlineEl = document.getElementById('online-count');
+        const offlineEl = document.getElementById('offline-count');
+
+        if (totalEl) totalEl.textContent = total;
+        if (onlineEl) onlineEl.textContent = online;
+        if (offlineEl) offlineEl.textContent = offline;
+
+        createStatusChart(online, offline, unknown);
+        populateDashboardAlerts(devices);
+    } catch (err) {
+        console.warn('Dashboard: unable to fetch scan results.', err);
+    }
+}
+
+function initDashboard() {
+    const canvas = document.getElementById('statusChart');
+    if (!canvas) return;
+
+    const isDashboard = document.getElementById('total-devices');
+    if (!isDashboard) return;
+
+    fetchDashboardData();
+
+    const refreshMs = Number(window.DEVICE_SCAN_REFRESH_MS || 15000);
+    dashboardRefreshTimer = setInterval(fetchDashboardData, refreshMs);
 }
 
 function toggleSidebar() {
@@ -418,7 +703,11 @@ function logout() {
     const bsModal = new bootstrap.Modal(modalEl, { backdrop: 'static' });
 
     document.getElementById('confirmLogoutBtn').addEventListener('click', function () {
-        window.location.href = 'login.html';
+        if (typeof window.firebaseLogout === 'function') {
+            window.firebaseLogout();
+        } else {
+            window.location.href = 'login.html';
+        }
     });
 
     modalEl.addEventListener('hidden.bs.modal', function () {
@@ -456,8 +745,10 @@ window.onload = async function () {
     populateRecentAlerts();
     populateAlertsTable();
     populateReportsTable();
-    createStatusChart();
+    initDashboard();
     initTopology();
+    initDeviceScanner();
+    initDeviceAutoRefresh();
 
     console.log('%cCampusNet UI layout loaded successfully!', 'color:#0d6efd; font-weight:bold');
 };
