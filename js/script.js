@@ -50,7 +50,7 @@ function initDeviceAutoRefresh() {
     const table = document.getElementById('devices-table');
     if (!table) return;
 
-    const deviceScanBase = window.DEVICE_SCAN_API_BASE || 'http://localhost:4000';
+    const deviceScanBase = window.DEVICE_SCAN_API_BASE || `http://${window.location.hostname || 'localhost'}:4000`; // HOST (YAW LIMOT)
     const resultsApi = window.DEVICE_SCAN_RESULTS_API || `${deviceScanBase}/api/scan/results`;
     const refreshMs = Number(window.DEVICE_SCAN_REFRESH_MS || 15000);
 
@@ -73,7 +73,7 @@ function initDeviceScanner() {
     const form = document.getElementById('deviceScanForm');
     if (!form) return;
 
-    const deviceScanBase = window.DEVICE_SCAN_API_BASE || 'http://localhost:4000';
+    const deviceScanBase = window.DEVICE_SCAN_API_BASE || `http://${window.location.hostname || 'localhost'}:4000`; // HOST (YAW LIMOT)
     const deviceScanApi = window.DEVICE_SCAN_API || `${deviceScanBase}/api/scan`;
 
     const ipInput = document.getElementById('scanIp');
@@ -703,8 +703,8 @@ function logout() {
     const bsModal = new bootstrap.Modal(modalEl, { backdrop: 'static' });
 
     document.getElementById('confirmLogoutBtn').addEventListener('click', function () {
-        if (typeof window.firebaseLogout === 'function') {
-            window.firebaseLogout();
+        if (typeof window.appLogout === 'function') {
+            window.appLogout();
         } else {
             window.location.href = 'login.html';
         }

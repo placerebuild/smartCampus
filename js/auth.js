@@ -1,118 +1,141 @@
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.10.0/firebase-app.js";
-import {
-    getAuth,
-    createUserWithEmailAndPassword,
-    signInWithEmailAndPassword,
-    signOut,
-    onAuthStateChanged
-} from "https://www.gstatic.com/firebasejs/10.10.0/firebase-auth.js";
-
-import {
-    getFirestore,
-    doc,
-    setDoc,
-    getDoc,
-    updateDoc
-} from "https://www.gstatic.com/firebasejs/10.10.0/firebase-firestore.js";
-
-// ================== fIREBASE CONFIG ==================
-const firebaseConfig = {
-    apiKey: "AIzaSyBHT49RayxsqQcHjy8eUr_kaO9fTgVRrkI",
-    authDomain: "smartcampus-7ab39.firebaseapp.com",
-    projectId: "smartcampus-7ab39",
-    storageBucket: "smartcampus-7ab39.firebasestorage.app",
-    messagingSenderId: "575231840475",
-    appId: "1:575231840475:web:89b7d09d4defbe244dbcfe",
-    measurementId: "G-76MCXMF3KV"
-};
-
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
-
-window.firebaseAuth = auth;
-window.firebaseDb = db;
-
+const authHost = window.location.hostname || 'localhost';
+const AUTH_API_BASE = window.AUTH_API_BASE || `http://${authHost}:4000`;
 const currentPath = window.location.pathname;
 const isAuthPage = currentPath.endsWith('login.html') || currentPath.endsWith('signup.html');
 
 window.isAuthenticating = false;
 
-onAuthStateChanged(auth, async (user) => {
+function splitFullName(fullName) {
+    const trimmed = String(fullName || '').trim();
+    if (!trimmed) {
+        return { firstName: '', lastName: '' };
+    }
+
+    const parts = trimmed.split(/\s+/);
+    if (parts.length === 1) {
+        return { firstName: parts[0], lastName: '' };
+    }
+
+    const lastName = parts.pop();
+    return { firstName: parts.join(' '), lastName };
+}
+
+async function apiRequest(path, options = {}) {
+    const headers = {
+        'Content-Type': 'application/json',
+        ...options.headers
+    };
+
+    return fetch(`${AUTH_API_BASE}${path}`, {
+        credentials: 'include',
+        ...options,
+        headers
+    });
+}
+
+function applyUserToNav(user) {
+    const navUserName = document.getElementById('navUserName');
+    if (!navUserName) return;
+    const nameParts = splitFullName(user.fullName || '');
+    navUserName.textContent = nameParts.firstName || user.fullName || 'User';
+}
+
+function applyUserToProfile(user) {
+    if (!currentPath.endsWith('profile.html')) return;
+
+    const nameParts = splitFullName(user.fullName || '');
+    const displayName = user.fullName || `${nameParts.firstName} ${nameParts.lastName}`.trim() || 'User';
+
+    const displayNameEl = document.getElementById('profileDisplayName');
+    const displayRoleEl = document.getElementById('profileDisplayRole');
+    const firstNameEl = document.getElementById('profileFirstName');
+    const lastNameEl = document.getElementById('profileLastName');
+    const emailEl = document.getElementById('profileEmail');
+    const contactEl = document.getElementById('profileContact');
+    const roleEl = document.getElementById('profileRole');
+
+    if (displayNameEl) displayNameEl.textContent = displayName;
+    if (displayRoleEl) displayRoleEl.textContent = user.role || 'Technical Staff';
+    if (firstNameEl) firstNameEl.value = nameParts.firstName || '';
+    if (lastNameEl) lastNameEl.value = nameParts.lastName || '';
+    if (emailEl) emailEl.value = user.email || '';
+    if (contactEl) contactEl.value = user.contactNumber || '';
+    if (roleEl) roleEl.value = user.role || 'Technical Staff';
+
+    const saveBtn = document.getElementById('profileSaveBtn');
+    if (!saveBtn) return;
+
+    saveBtn.onclick = async () => {
+        const newFirstName = firstNameEl ? firstNameEl.value.trim() : '';
+        const newLastName = lastNameEl ? lastNameEl.value.trim() : '';
+        const newContact = contactEl ? contactEl.value.trim() : '';
+
+        if (!newFirstName || !newLastName) {
+            alert('First and last name are required.');
+            return;
+        }
+
+        try {
+            saveBtn.disabled = true;
+            saveBtn.textContent = 'Saving...';
+
+            const response = await apiRequest('/api/auth/profile', {
+                method: 'PUT',
+                body: JSON.stringify({
+                    firstName: newFirstName,
+                    lastName: newLastName,
+                    contactNumber: newContact
+                })
+            });
+
+            if (!response.ok) {
+                const payload = await response.json().catch(() => ({}));
+                throw new Error(payload.error || 'Unable to save profile.');
+            }
+
+            const updatedUser = await response.json();
+            applyUserToNav(updatedUser);
+            applyUserToProfile(updatedUser);
+            alert('Profile saved successfully!');
+        } catch (error) {
+            console.error('Profile update error:', error);
+            alert(error.message || 'Error saving profile.');
+        } finally {
+            saveBtn.disabled = false;
+            saveBtn.textContent = 'Save Profile';
+        }
+    };
+}
+
+async function loadSessionUser() {
+    try {
+        const response = await apiRequest('/api/auth/me');
+        if (!response.ok) return null;
+        return await response.json();
+    } catch (error) {
+        console.warn('Auth: unable to reach server.', error);
+        return null;
+    }
+}
+
+async function initializeAuthState() {
+    const user = await loadSessionUser();
+
     if (user) {
-        // User is logged in
         if (isAuthPage && !window.isAuthenticating) {
             window.location.href = 'index.html';
             return;
         }
 
-        // Fetch user data from Firestore
-        try {
-            const userDocRef = doc(db, "users", user.uid);
-            const userDocSnap = await getDoc(userDocRef);
-
-            if (userDocSnap.exists()) {
-                const userData = userDocSnap.data();
-
-                const navUserName = document.getElementById('navUserName');
-                if (navUserName) {
-                    navUserName.textContent = userData.firstName || "User";
-                }
-
-                if (currentPath.endsWith('profile.html')) {
-                    document.getElementById('profileDisplayName').textContent = `${userData.firstName} ${userData.lastName}`;
-                    document.getElementById('profileDisplayRole').textContent = userData.role || "Technical Staff";
-
-                    document.getElementById('profileFirstName').value = userData.firstName || "";
-                    document.getElementById('profileLastName').value = userData.lastName || "";
-                    document.getElementById('profileEmail').value = userData.email || "";
-                    document.getElementById('profileContact').value = userData.contactNumber || "";
-                    document.getElementById('profileRole').value = userData.role || "Technical Staff";
-
-                    // Attach Save Listener
-                    const saveBtn = document.getElementById('profileSaveBtn');
-                    if (saveBtn) {
-                        saveBtn.onclick = async () => {
-                            const newFirstName = document.getElementById('profileFirstName').value;
-                            const newLastName = document.getElementById('profileLastName').value;
-                            const newContact = document.getElementById('profileContact').value;
-
-                            try {
-                                saveBtn.disabled = true;
-                                saveBtn.textContent = "Saving...";
-
-                                await updateDoc(userDocRef, {
-                                    firstName: newFirstName,
-                                    lastName: newLastName,
-                                    contactNumber: newContact
-                                });
-
-                                document.getElementById('profileDisplayName').textContent = `${newFirstName} ${newLastName}`;
-                                if (navUserName) navUserName.textContent = newFirstName;
-
-                                alert("Profile saved successfully!");
-                            } catch (error) {
-                                console.error("Error updating profile:", error);
-                                alert("Error saving profile: " + error.message);
-                            } finally {
-                                saveBtn.disabled = false;
-                                saveBtn.textContent = "Save Profile";
-                            }
-                        };
-                    }
-                }
-            }
-        } catch (error) {
-            console.error("Error fetching user data:", error);
-        }
-
-    } else {
-        // User is logged out
-        if (!isAuthPage) {
-            window.location.href = 'login.html';
-        }
+        applyUserToNav(user);
+        applyUserToProfile(user);
+        return;
     }
-});
+
+    if (!isAuthPage) {
+        window.location.href = 'login.html';
+    }
+}
 
 // ================== SIGNUP FORM ==================
 const signupForm = document.getElementById('signupForm');
@@ -149,24 +172,26 @@ if (signupForm) {
             btn.disabled = true;
             btn.textContent = 'Creating Account...';
 
-            const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-            const user = userCredential.user;
-
-            await setDoc(doc(db, "users", user.uid), {
-                firstName: firstName,
-                lastName: lastName,
-                email: email,
-                role: "Technical Staff",
-                contactNumber: "",
-                createdAt: new Date().toISOString()
+            const response = await apiRequest('/api/auth/register', {
+                method: 'POST',
+                body: JSON.stringify({
+                    firstName,
+                    lastName,
+                    email,
+                    password
+                })
             });
 
-            alert("Account created successfully!");
-            window.location.href = 'index.html';
+            if (!response.ok) {
+                const payload = await response.json().catch(() => ({}));
+                throw new Error(payload.error || 'Unable to create account.');
+            }
 
+            alert('Account created successfully!');
+            window.location.href = 'index.html';
         } catch (error) {
-            console.error("Signup error:", error);
-            alert("Error: " + error.message);
+            console.error('Signup error:', error);
+            alert(error.message || 'Unable to create account.');
             btn.disabled = false;
             btn.textContent = 'Register Account';
             window.isAuthenticating = false;
@@ -188,12 +213,20 @@ if (loginForm) {
             btn.disabled = true;
             btn.textContent = 'Signing In...';
 
-            await signInWithEmailAndPassword(auth, email, password);
-            // Redirect handled automatically by onAuthStateChanged
+            const response = await apiRequest('/api/auth/login', {
+                method: 'POST',
+                body: JSON.stringify({ email, password })
+            });
 
+            if (!response.ok) {
+                const payload = await response.json().catch(() => ({}));
+                throw new Error(payload.error || 'Invalid email or password.');
+            }
+
+            window.location.href = 'index.html';
         } catch (error) {
-            console.error("Login error:", error);
-            alert("Invalid email or password!");
+            console.error('Login error:', error);
+            alert(error.message || 'Invalid email or password!');
             btn.disabled = false;
             btn.textContent = 'Sign In';
         }
@@ -201,11 +234,14 @@ if (loginForm) {
 }
 
 // ================== LOGOUT FUNCTION ==================
-window.firebaseLogout = async function () {
+window.appLogout = async function () {
     try {
-        await signOut(auth);
+        await apiRequest('/api/auth/logout', { method: 'POST' });
     } catch (error) {
-        console.error("Logout error:", error);
-        alert("Error logging out: " + error.message);
+        console.error('Logout error:', error);
+    } finally {
+        window.location.href = 'login.html';
     }
 };
+
+initializeAuthState();
