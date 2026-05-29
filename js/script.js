@@ -44,142 +44,11 @@ function applyDeviceResults(devices) {
         lastSeen: formatLastSeen(device.lastSeen)
     }));
     populateDevicesTable();
+    setTopologyDevices(devices);
+    updateTopologyData({ fit: false });
 }
 
-function initDeviceAutoRefresh() {
-    const table = document.getElementById('devices-table');
-    if (!table) return;
 
-    const deviceScanBase = window.DEVICE_SCAN_API_BASE || `http://${window.location.hostname || 'localhost'}:4000`; // HOST (YAW LIMOT)
-    const resultsApi = window.DEVICE_SCAN_RESULTS_API || `${deviceScanBase}/api/scan/results`;
-    const refreshMs = Number(window.DEVICE_SCAN_REFRESH_MS || 15000);
-
-    const refresh = async () => {
-        try {
-            const response = await fetch(resultsApi, { cache: 'no-store' });
-            if (!response.ok) return;
-            const payload = await response.json();
-            applyDeviceResults(payload);
-        } catch (error) {
-            console.warn('Unable to fetch device scan results.', error);
-        }
-    };
-
-    refresh();
-    setInterval(refresh, refreshMs);
-}
-
-function initDeviceScanner() {
-    const form = document.getElementById('deviceScanForm');
-    if (!form) return;
-
-    const deviceScanBase = window.DEVICE_SCAN_API_BASE || `http://${window.location.hostname || 'localhost'}:4000`; // HOST (YAW LIMOT)
-    const deviceScanApi = window.DEVICE_SCAN_API || `${deviceScanBase}/api/scan`;
-
-    const ipInput = document.getElementById('scanIp');
-    const nameInput = document.getElementById('scanName');
-    const typeInput = document.getElementById('scanType');
-    const locationInput = document.getElementById('scanLocation');
-    const statusMessage = document.getElementById('scanStatusMessage');
-    const submitBtn = document.getElementById('scanSubmitBtn');
-    const modalEl = document.getElementById('deviceScanModal');
-    const modalInstance = modalEl ? bootstrap.Modal.getOrCreateInstance(modalEl) : null;
-
-    if (modalEl) {
-        modalEl.addEventListener('hidden.bs.modal', () => {
-            if (statusMessage) {
-                statusMessage.textContent = 'Provide an IP address to add a device.';
-                setScanStatusTone(statusMessage, 'text-muted');
-            }
-            form.reset();
-        });
-    }
-
-    form.addEventListener('submit', async (event) => {
-        event.preventDefault();
-
-        const ip = ipInput ? ipInput.value.trim() : '';
-        const name = nameInput ? nameInput.value.trim() : '';
-        const type = typeInput ? typeInput.value.trim() : 'Gateway';
-        const location = locationInput ? locationInput.value.trim() : '';
-
-        if (!isValidIpAddress(ip)) {
-            if (statusMessage) {
-                statusMessage.textContent = 'Enter a valid IPv4 address (example: 192.168.1.1).';
-                setScanStatusTone(statusMessage, 'text-danger');
-            }
-            return;
-        }
-
-        if (submitBtn) submitBtn.disabled = true;
-        if (statusMessage) {
-            statusMessage.textContent = 'Scanning device...';
-            setScanStatusTone(statusMessage, 'text-info');
-        }
-
-        try {
-            const response = await fetch(deviceScanApi, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    ip,
-                    name,
-                    type,
-                    location
-                })
-            });
-
-            if (!response.ok) {
-                let message = 'Scan failed. Please try again.';
-                try {
-                    const payload = await response.json();
-                    if (payload && payload.error) message = payload.error;
-                } catch (error) {
-                    message = response.statusText || message;
-                }
-
-                if (statusMessage) {
-                    statusMessage.textContent = message;
-                    setScanStatusTone(statusMessage, 'text-danger');
-                }
-                return;
-            }
-
-            const payload = await response.json();
-            const lastSeen = payload.lastSeen ? new Date(payload.lastSeen).toLocaleString() : new Date().toLocaleString();
-            const deviceRecord = {
-                id: payload.id || deviceIdCounter++,
-                name: payload.name || name || `Device ${ip}`,
-                type: payload.type || type || 'Other',
-                ip: payload.ip || ip,
-                location: payload.location || location || 'Unassigned',
-                status: payload.status || 'Unknown',
-                lastSeen: lastSeen
-            };
-
-            upsertDevice(deviceRecord);
-            populateDevicesTable();
-
-            if (statusMessage) {
-                statusMessage.textContent = 'Device added to inventory.';
-                setScanStatusTone(statusMessage, 'text-success');
-            }
-
-            if (modalInstance) {
-                modalInstance.hide();
-            }
-        } catch (error) {
-            if (statusMessage) {
-                statusMessage.textContent = 'Scan service unavailable. Is the server running?';
-                setScanStatusTone(statusMessage, 'text-danger');
-            }
-        } finally {
-            if (submitBtn) submitBtn.disabled = false;
-        }
-    });
-}
 
 function populateDevicesTable() {
     const tbody = document.querySelector('#devices-table tbody');
@@ -268,11 +137,65 @@ function populateReportsTable() {
     }).join('');
 }
 
-let networkInstance;
+let topologyNetwork = null;
+let topologyNodes = null;
+let topologyEdges = null;
+let topologySelectedId = null;
+let topologyViewMode = 'logical';
+let topologyTrafficTimer = null;
+let topologyPollTimer = null;
+let topologySocket = null;
 
-const campusDevices = [];
+const topologyIconCache = new Map();
 
-const campusLinks = [];
+let campusDevices = [];
+
+let campusLinks = [];
+
+function getTopologyApiBase() {
+    const host = window.location.hostname || 'localhost';
+    return window.TOPOLOGY_API_BASE || window.MONITOR_API_BASE || `http://${host}:4000`;
+}
+
+const TOPOLOGY_POLL_INTERVAL_MS = Number(window.TOPOLOGY_POLL_INTERVAL_MS || 15000);
+
+function normalizeTopologyDevice(device) {
+    const idSource = device && (device.id || device.DeviceID || device.ip || device.name);
+    return {
+        id: idSource ? String(idSource) : 'device-unknown',
+        name: (device && (device.name || device.DeviceName || device.ip)) || 'Device',
+        type: (device && (device.type || device.DeviceType)) || 'Device',
+        ip: (device && (device.ip || device.IPAddress)) || '',
+        status: (device && device.status) || 'Warning',
+        building: (device && device.building) || '',
+        floor: (device && device.floor) || '',
+        room: (device && device.room) || '',
+        location: (device && device.location) || ''
+    };
+}
+
+function normalizeTopologyLink(link) {
+    const fromId = link && link.from ? String(link.from) : '';
+    const toId = link && link.to ? String(link.to) : '';
+    const idFallback = fromId && toId ? `link-${fromId}-${toId}` : 'link-unknown';
+    return {
+        id: link && link.id ? String(link.id) : idFallback,
+        from: fromId,
+        to: toId,
+        medium: (link && link.medium) || '',
+        bandwidth: (link && link.bandwidth) || '',
+        status: (link && link.status) || 'Online',
+        traffic: link && link.traffic ? link.traffic : 'normal'
+    };
+}
+
+function setTopologyDevices(devices) {
+    campusDevices = Array.isArray(devices) ? devices.map(normalizeTopologyDevice) : [];
+}
+
+function setTopologyLinks(links) {
+    campusLinks = Array.isArray(links) ? links.map(normalizeTopologyLink) : [];
+}
 
 function statusColor(status) {
     if (status === 'Online') return '#22a55a';
@@ -285,6 +208,50 @@ function linkColor(status) {
     return '#f09a35';
 }
 
+function buildSvgDataUri(svg) {
+    return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+}
+
+function getTopologyIcon(type) {
+    const key = String(type || '').toLowerCase();
+    if (topologyIconCache.has(key)) {
+        return topologyIconCache.get(key);
+    }
+
+    const routerSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><circle cx="32" cy="32" r="22" fill="#f2f7ff" stroke="#0f2338" stroke-width="3"/><path d="M32 14v10M32 40v10M14 32h10M40 32h10" stroke="#0f2338" stroke-width="3" stroke-linecap="round"/><circle cx="32" cy="32" r="4" fill="#0f2338"/></svg>';
+    const switchSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect x="8" y="18" width="48" height="28" rx="6" fill="#f2f7ff" stroke="#0f2338" stroke-width="3"/><circle cx="20" cy="32" r="2" fill="#0f2338"/><circle cx="28" cy="32" r="2" fill="#0f2338"/><circle cx="36" cy="32" r="2" fill="#0f2338"/><circle cx="44" cy="32" r="2" fill="#0f2338"/></svg>';
+    const serverSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect x="18" y="10" width="28" height="44" rx="4" fill="#f2f7ff" stroke="#0f2338" stroke-width="3"/><rect x="24" y="22" width="16" height="2" fill="#0f2338"/><rect x="24" y="30" width="16" height="2" fill="#0f2338"/><rect x="24" y="38" width="16" height="2" fill="#0f2338"/><circle cx="32" cy="46" r="2" fill="#0f2338"/></svg>';
+    const pcSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect x="12" y="14" width="40" height="26" rx="4" fill="#f2f7ff" stroke="#0f2338" stroke-width="3"/><rect x="24" y="42" width="16" height="4" fill="#0f2338"/><rect x="20" y="48" width="24" height="4" fill="#0f2338"/></svg>';
+    const apSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><circle cx="32" cy="34" r="6" fill="#0f2338"/><path d="M20 26c7-7 17-7 24 0" stroke="#0f2338" stroke-width="3" stroke-linecap="round" fill="none"/><path d="M24 30c4-4 12-4 16 0" stroke="#0f2338" stroke-width="3" stroke-linecap="round" fill="none"/></svg>';
+
+    let svg = switchSvg;
+    if (key.includes('router') || key.includes('gateway')) {
+        svg = routerSvg;
+    } else if (key.includes('server')) {
+        svg = serverSvg;
+    } else if (key.includes('pc') || key.includes('workstation') || key.includes('desktop')) {
+        svg = pcSvg;
+    } else if (key.includes('ap') || key.includes('wifi') || key.includes('wireless')) {
+        svg = apSvg;
+    } else if (key.includes('switch')) {
+        svg = switchSvg;
+    }
+
+    const icon = buildSvgDataUri(svg);
+    topologyIconCache.set(key, icon);
+    return icon;
+}
+
+function buildTopologyLabel(device) {
+    const ipLine = device.ip ? `\n${device.ip}` : '';
+    return `${device.name}${ipLine}`.trim();
+}
+
+function buildTopologyTitle(device) {
+    const parts = [device.type, device.building, device.floor].filter(Boolean);
+    return parts.join(' | ');
+}
+
 function getTopologyFilters() {
     const buildingFilter = document.getElementById('building-filter');
     const statusFilter = document.getElementById('status-filter');
@@ -293,6 +260,251 @@ function getTopologyFilters() {
         building: buildingFilter ? buildingFilter.value : 'all',
         status: statusFilter ? statusFilter.value : 'all'
     };
+}
+
+function initTopologyFilters() {
+    const buildingFilter = document.getElementById('building-filter');
+    if (!buildingFilter) return;
+
+    const buildings = [...new Set(campusDevices.map(device => device.building))].sort((a, b) =>
+        a.localeCompare(b)
+    );
+
+    buildingFilter.innerHTML = `
+        <option value="all" selected>All Buildings</option>
+        ${buildings.map(building => `<option value="${building}">${building}</option>`).join('')}
+    `;
+}
+
+function normalizeTopologyPayload(payload) {
+    if (Array.isArray(payload)) {
+        return { devices: payload, links: [] };
+    }
+
+    return {
+        devices: Array.isArray(payload && payload.devices) ? payload.devices : [],
+        links: Array.isArray(payload && payload.links) ? payload.links : []
+    };
+}
+
+async function fetchTopologySnapshot() {
+    const baseUrl = getTopologyApiBase();
+    const response = await fetch(`${baseUrl}/api/topology`, { credentials: 'include' });
+
+    if (response.status === 401) {
+        return null;
+    }
+
+    if (response.ok) {
+        return response.json();
+    }
+
+    if (response.status === 404) {
+        const fallback = await fetch(`${baseUrl}/api/devices`, { credentials: 'include' });
+        if (!fallback.ok) return null;
+        return fallback.json();
+    }
+
+    return null;
+}
+
+async function loadTopologySnapshot(options = {}) {
+    try {
+        const payload = await fetchTopologySnapshot();
+        if (!payload) {
+            updateTopologyEmptyState(false);
+            return;
+        }
+
+        const normalized = normalizeTopologyPayload(payload);
+        setTopologyDevices(normalized.devices);
+        setTopologyLinks(normalized.links);
+        updateTopologyData(options);
+    } catch (error) {
+        console.warn('Topology snapshot load failed:', error.message || error);
+    }
+}
+
+async function triggerTopologyScan() {
+    const baseUrl = getTopologyApiBase();
+    try {
+        await fetch(`${baseUrl}/api/monitor/discover`, {
+            method: 'POST',
+            credentials: 'include'
+        });
+        await fetch(`${baseUrl}/api/monitor/router`, { credentials: 'include' });
+    } catch (error) {
+        console.warn('Topology scan trigger failed:', error.message || error);
+    }
+}
+
+function updateTopologyEmptyState(hasData) {
+    const emptyState = document.getElementById('topology-empty-state');
+    if (!emptyState) return;
+    if (hasData) {
+        emptyState.classList.remove('active');
+    } else {
+        emptyState.classList.add('active');
+    }
+}
+
+function syncDataSet(dataset, items) {
+    const ids = new Set(items.map(item => item.id));
+    dataset.forEach(item => {
+        if (!ids.has(item.id)) {
+            dataset.remove(item.id);
+        }
+    });
+    dataset.update(items);
+}
+
+function updateTopologyData(options = {}) {
+    if (!topologyNetwork || !topologyNodes || !topologyEdges) return;
+
+    const topologyData = buildTopologyData();
+    syncDataSet(topologyNodes, topologyData.nodes);
+    syncDataSet(topologyEdges, topologyData.edges);
+
+    initTopologyFilters();
+    updateTopologyEmptyState(topologyData.nodes.length > 0);
+
+    if (topologySelectedId) {
+        renderSelectedDevice(topologySelectedId);
+    }
+
+    if (options.fit) {
+        topologyNetwork.fit({
+            animation: {
+                duration: 350,
+                easingFunction: 'easeInOutQuad'
+            }
+        });
+    }
+}
+
+function applyTopologyLayout(viewMode) {
+    if (!topologyNetwork) return;
+
+    if (viewMode === 'tree') {
+        topologyNetwork.setOptions({
+            layout: {
+                hierarchical: {
+                    enabled: true,
+                    direction: 'UD',
+                    sortMethod: 'hubsize',
+                    nodeSpacing: 140,
+                    levelSeparation: 130
+                }
+            },
+            physics: { enabled: false }
+        });
+        topologyNetwork.fit({ animation: { duration: 350 } });
+        return;
+    }
+
+    if (viewMode === 'floor') {
+        topologyNetwork.setOptions({
+            layout: { hierarchical: { enabled: false } },
+            physics: { enabled: false }
+        });
+        return;
+    }
+
+    topologyNetwork.setOptions({
+        layout: { hierarchical: { enabled: false } },
+        physics: {
+            enabled: true,
+            solver: 'forceAtlas2Based',
+            forceAtlas2Based: {
+                gravitationalConstant: -45,
+                centralGravity: 0.015,
+                springLength: 190,
+                springConstant: 0.08
+            },
+            stabilization: { iterations: 140 }
+        }
+    });
+}
+
+function startLinkTrafficAnimation() {
+    stopLinkTrafficAnimation();
+    if (!topologyEdges) return;
+
+    let pulse = false;
+    topologyTrafficTimer = setInterval(() => {
+        if (!topologyEdges) return;
+        pulse = !pulse;
+        const updates = [];
+        topologyEdges.forEach(edge => {
+            if (edge.status !== 'Online') return;
+            updates.push({
+                id: edge.id,
+                width: pulse ? 3 : 2,
+                color: { color: pulse ? '#12b3c7' : edge.baseColor || linkColor(edge.status) }
+            });
+        });
+        if (updates.length) {
+            topologyEdges.update(updates);
+        }
+    }, 700);
+}
+
+function stopLinkTrafficAnimation() {
+    if (topologyTrafficTimer) {
+        clearInterval(topologyTrafficTimer);
+        topologyTrafficTimer = null;
+    }
+}
+
+function startTopologyRealtime() {
+    stopTopologyRealtime();
+    const poll = async () => {
+        await triggerTopologyScan();
+        await loadTopologySnapshot({ fit: false });
+    };
+
+    poll();
+    topologyPollTimer = setInterval(poll, TOPOLOGY_POLL_INTERVAL_MS);
+
+    if (typeof io === 'function') {
+        topologySocket = io(getTopologyApiBase(), {
+            withCredentials: true,
+            transports: ['websocket', 'polling']
+        });
+
+        topologySocket.on('topology:update', payload => {
+            const normalized = normalizeTopologyPayload(payload);
+            setTopologyDevices(normalized.devices);
+            setTopologyLinks(normalized.links);
+            updateTopologyData({ fit: false });
+        });
+
+        topologySocket.on('topology:devices', devices => {
+            setTopologyDevices(devices);
+            updateTopologyData({ fit: false });
+        });
+
+        topologySocket.on('topology:links', links => {
+            setTopologyLinks(links);
+            updateTopologyData({ fit: false });
+        });
+    }
+
+    startLinkTrafficAnimation();
+}
+
+function stopTopologyRealtime() {
+    if (topologyPollTimer) {
+        clearInterval(topologyPollTimer);
+        topologyPollTimer = null;
+    }
+
+    if (topologySocket) {
+        topologySocket.disconnect();
+        topologySocket = null;
+    }
+
+    stopLinkTrafficAnimation();
 }
 
 function buildTopologyData() {
@@ -306,32 +518,63 @@ function buildTopologyData() {
 
     const visibleIds = new Set(filteredDevices.map(device => device.id));
 
-    const nodes = filteredDevices.map(device => ({
-        data: {
-            id: String(device.id),
-            label: `${device.name}\n${device.ip}`,
-            type: device.type,
-            status: device.status,
-            tooltip: `${device.type} • ${device.building} • ${device.floor}`
-        },
-        position: { x: device.x, y: device.y },
-        locked: true
-    }));
+    const nodes = filteredDevices.map(device => {
+        const nodeColor = statusColor(device.status);
+        const node = {
+            id: device.id,
+            label: buildTopologyLabel(device),
+            title: buildTopologyTitle(device),
+            shape: 'image',
+            image: getTopologyIcon(device.type),
+            size: 30,
+            borderWidth: 2,
+            color: {
+                border: nodeColor,
+                background: '#ffffff',
+                highlight: {
+                    border: '#12b3c7',
+                    background: '#ffffff'
+                }
+            },
+            font: {
+                color: '#0f2338',
+                size: 12,
+                face: 'IBM Plex Sans',
+                align: 'center'
+            },
+            shapeProperties: {
+                useBorderWithImage: true
+            }
+        };
+
+        if (Number.isFinite(device.x) && Number.isFinite(device.y)) {
+            node.x = device.x;
+            node.y = device.y;
+            node.fixed = device.locked === true;
+        }
+
+        return node;
+    });
 
     const edges = campusLinks
         .filter(link => visibleIds.has(link.from) && visibleIds.has(link.to))
-        .map(link => ({
-            data: {
+        .map(link => {
+            const baseColor = linkColor(link.status);
+            const labelParts = [link.medium, link.bandwidth].filter(Boolean);
+            return {
                 id: link.id,
-                source: String(link.from),
-                target: String(link.to),
-                label: `${link.medium} (${link.bandwidth})`,
+                from: link.from,
+                to: link.to,
+                label: labelParts.length ? labelParts.join(' (') + (labelParts.length > 1 ? ')' : '') : '',
+                color: { color: baseColor },
+                width: link.status === 'Online' ? 2 : 3,
+                dashes: link.status !== 'Online',
+                smooth: { type: 'dynamic' },
+                arrows: { to: { enabled: false } },
                 status: link.status,
-                lineColor: linkColor(link.status),
-                lineStyle: link.status === 'Online' ? 'solid' : 'dashed',
-                lineWidth: link.status === 'Online' ? 2 : 3
-            }
-        }));
+                baseColor
+            };
+        });
 
     return { nodes, edges };
 }
@@ -341,25 +584,30 @@ function renderSelectedDevice(deviceId) {
     if (!detailsContainer) return;
 
     if (!deviceId) {
+        topologySelectedId = null;
         detailsContainer.innerHTML = '<p class="text-muted mb-0">No device selected yet.</p>';
         return;
     }
 
-    const device = campusDevices.find(item => item.id === deviceId);
+    const normalizedId = String(deviceId);
+    topologySelectedId = normalizedId;
+    const device = campusDevices.find(item => item.id === normalizedId);
     if (!device) {
         detailsContainer.innerHTML = '<p class="text-muted mb-0">Device details unavailable.</p>';
         return;
     }
 
-    const connectedLinks = campusLinks.filter(link => link.from === deviceId || link.to === deviceId);
+    const connectedLinks = campusLinks.filter(link => link.from === normalizedId || link.to === normalizedId);
     const connectedDevices = connectedLinks.map(link => {
-        const peerId = link.from === deviceId ? link.to : link.from;
+        const peerId = link.from === normalizedId ? link.to : link.from;
         const peer = campusDevices.find(item => item.id === peerId);
+        const metaParts = [];
+        if (link.medium) metaParts.push(link.medium);
+        if (link.bandwidth) metaParts.push(link.bandwidth);
+        metaParts.push(`<span style="color:${linkColor(link.status)}">${link.status}</span>`);
         return {
             name: peer ? peer.name : 'Unknown',
-            medium: link.medium,
-            bandwidth: link.bandwidth,
-            status: link.status
+            metaLine: metaParts.join(' | ')
         };
     });
 
@@ -370,139 +618,101 @@ function renderSelectedDevice(deviceId) {
             <li><span class="device-detail-label">IP Address</span><code>${device.ip}</code></li>
             <li><span class="device-detail-label">Building</span><span>${device.building}</span></li>
             <li><span class="device-detail-label">Floor</span><span>${device.floor}</span></li>
+            <li><span class="device-detail-label">Room/Area</span><span>${device.room || 'N/A'}</span></li>
             <li><span class="device-detail-label">Status</span><span style="color:${statusColor(device.status)};font-weight:700">${device.status}</span></li>
         </ul>
         <h6 class="section-title mb-2">Connected Links (${connectedDevices.length})</h6>
         ${connectedDevices.length === 0
-            ? '<p class="text-muted mb-0">No active links in current filter scope.</p>'
-            : connectedDevices.map(conn => `
-                <div class="device-connection-item">
-                    <strong>${conn.name}</strong><br>
-                    <small>${conn.medium} • ${conn.bandwidth} • <span style="color:${linkColor(conn.status)}">${conn.status}</span></small>
-                </div>
-            `).join('')}
+                    ? '<p class="text-muted mb-0">No active links in current filter scope.</p>'
+                    : connectedDevices.map(conn => `
+                        <div class="device-connection-item">
+                            <strong>${conn.name}</strong><br>
+                            <small>${conn.metaLine}</small>
+                        </div>
+                    `).join('')}
     `;
 }
 
 function refreshTopology() {
-    if (!networkInstance) return;
-
-    const topologyData = buildTopologyData();
-    networkInstance.elements().remove();
-    networkInstance.add([...topologyData.nodes, ...topologyData.edges]);
-
-    renderSelectedDevice(null);
-    networkInstance.layout({
-        name: 'preset',
-        fit: true,
-        padding: 28,
-        animate: true,
-        animationDuration: 350
-    }).run();
+    updateTopologyData({ fit: true });
 }
 
 function initTopology() {
     const container = document.getElementById('network');
-    if (!container) return;
+    if (!container || typeof vis === 'undefined') return;
 
-    const topologyData = buildTopologyData();
-    networkInstance = cytoscape({
-        container,
-        elements: [...topologyData.nodes, ...topologyData.edges],
-        style: [
-            {
-                selector: 'node',
-                style: {
-                    'label': 'data(label)',
-                    'shape': 'round-rectangle',
-                    'width': 118,
-                    'height': 40,
-                    'background-color': 'data(status)',
-                    'border-width': 1.4,
-                    'border-color': '#0f2338',
-                    'text-valign': 'center',
-                    'text-halign': 'center',
-                    'font-size': 11,
-                    'font-family': 'IBM Plex Sans',
-                    'color': '#10263f',
-                    'text-wrap': 'wrap',
-                    'text-max-width': 110,
-                    'overlay-opacity': 0
-                }
-            },
-            {
-                selector: 'node[type = "Wi-Fi AP"]',
-                style: {
-                    'shape': 'ellipse',
-                    'width': 58,
-                    'height': 58,
-                    'text-max-width': 64
-                }
-            },
-            {
-                selector: 'node[status = "Online"]',
-                style: {
-                    'background-color': '#22a55a'
-                }
-            },
-            {
-                selector: 'node[status = "Offline"]',
-                style: {
-                    'background-color': '#de5b54'
-                }
-            },
-            {
-                selector: 'node[status = "Warning"]',
-                style: {
-                    'background-color': '#f09a35'
-                }
-            },
-            {
-                selector: 'edge',
-                style: {
-                    'curve-style': 'bezier',
-                    'line-color': 'data(lineColor)',
-                    'width': 'data(lineWidth)',
-                    'line-style': 'data(lineStyle)',
-                    'target-arrow-shape': 'none',
-                    'label': 'data(label)',
-                    'font-size': 10,
-                    'color': '#4d6681',
-                    'text-background-opacity': 1,
-                    'text-background-color': '#f8fbff',
-                    'text-background-padding': 2,
-                    'overlay-opacity': 0
-                }
-            },
-            {
-                selector: ':selected',
-                style: {
-                    'border-width': 3,
-                    'border-color': '#12b3c7',
-                    'line-color': '#12b3c7'
-                }
-            }
-        ],
-        layout: {
-            name: 'preset',
-            fit: true,
-            padding: 28
+    topologyNodes = new vis.DataSet([]);
+    topologyEdges = new vis.DataSet([]);
+    topologyNetwork = new vis.Network(container, { nodes: topologyNodes, edges: topologyEdges }, {
+        autoResize: true,
+        interaction: {
+            hover: true,
+            dragNodes: true,
+            dragView: true,
+            zoomView: true
         },
-        userZoomingEnabled: true,
-        userPanningEnabled: true,
-        boxSelectionEnabled: false
+        nodes: {
+            borderWidth: 2,
+            shape: 'image',
+            font: {
+                face: 'IBM Plex Sans',
+                size: 12,
+                color: '#0f2338',
+                align: 'center'
+            }
+        },
+        edges: {
+            smooth: { type: 'dynamic' },
+            font: {
+                face: 'IBM Plex Sans',
+                size: 10,
+                color: '#4d6681',
+                align: 'top'
+            }
+        },
+        physics: {
+            enabled: true,
+            solver: 'forceAtlas2Based',
+            forceAtlas2Based: {
+                gravitationalConstant: -45,
+                centralGravity: 0.015,
+                springLength: 190,
+                springConstant: 0.08
+            },
+            stabilization: { iterations: 140 }
+        }
     });
 
-    networkInstance.on('tap', 'node', function (evt) {
-        renderSelectedDevice(Number(evt.target.id()));
+    topologyNetwork.on('click', params => {
+        if (params.nodes && params.nodes.length) {
+            renderSelectedDevice(String(params.nodes[0]));
+        } else {
+            renderSelectedDevice(null);
+        }
     });
+
+    initTopologyFilters();
 
     const buildingFilter = document.getElementById('building-filter');
     const statusFilter = document.getElementById('status-filter');
     const resetButton = document.getElementById('reset-topology-btn');
+    const viewModeSelect = document.getElementById('topology-view-mode');
 
     if (buildingFilter) buildingFilter.addEventListener('change', refreshTopology);
     if (statusFilter) statusFilter.addEventListener('change', refreshTopology);
+    if (viewModeSelect) {
+        topologyViewMode = viewModeSelect.value || 'logical';
+        viewModeSelect.addEventListener('change', function () {
+            topologyViewMode = viewModeSelect.value || 'logical';
+            applyTopologyLayout(topologyViewMode);
+            if (topologyViewMode === 'realtime') {
+                startTopologyRealtime();
+            } else {
+                stopTopologyRealtime();
+                loadTopologySnapshot({ fit: false });
+            }
+        });
+    }
     if (resetButton) {
         resetButton.addEventListener('click', function () {
             if (buildingFilter) buildingFilter.value = 'all';
@@ -511,7 +721,13 @@ function initTopology() {
         });
     }
 
+    applyTopologyLayout(topologyViewMode);
     renderSelectedDevice(null);
+    loadTopologySnapshot({ fit: true });
+
+    if (topologyViewMode === 'realtime') {
+        startTopologyRealtime();
+    }
 }
 
 let dashboardChartInstance = null;
@@ -625,48 +841,7 @@ function populateDashboardAlerts(devices) {
     }).join('');
 }
 
-async function fetchDashboardData() {
-    const deviceScanBase = window.DEVICE_SCAN_API_BASE || 'http://localhost:4000';
-    const resultsApi = window.DEVICE_SCAN_RESULTS_API || `${deviceScanBase}/api/scan/results`;
 
-    try {
-        const response = await fetch(resultsApi, { cache: 'no-store' });
-        if (!response.ok) return;
-        const devices = await response.json();
-        if (!Array.isArray(devices)) return;
-
-        const total = devices.length;
-        const online = devices.filter(d => d.status === 'Online').length;
-        const offline = devices.filter(d => d.status === 'Offline').length;
-        const unknown = total - online - offline;
-
-        const totalEl = document.getElementById('total-devices');
-        const onlineEl = document.getElementById('online-count');
-        const offlineEl = document.getElementById('offline-count');
-
-        if (totalEl) totalEl.textContent = total;
-        if (onlineEl) onlineEl.textContent = online;
-        if (offlineEl) offlineEl.textContent = offline;
-
-        createStatusChart(online, offline, unknown);
-        populateDashboardAlerts(devices);
-    } catch (err) {
-        console.warn('Dashboard: unable to fetch scan results.', err);
-    }
-}
-
-function initDashboard() {
-    const canvas = document.getElementById('statusChart');
-    if (!canvas) return;
-
-    const isDashboard = document.getElementById('total-devices');
-    if (!isDashboard) return;
-
-    fetchDashboardData();
-
-    const refreshMs = Number(window.DEVICE_SCAN_REFRESH_MS || 15000);
-    dashboardRefreshTimer = setInterval(fetchDashboardData, refreshMs);
-}
 
 function toggleSidebar() {
     document.body.classList.toggle('sidebar-open');
@@ -745,10 +920,7 @@ window.onload = async function () {
     populateRecentAlerts();
     populateAlertsTable();
     populateReportsTable();
-    initDashboard();
     initTopology();
-    initDeviceScanner();
-    initDeviceAutoRefresh();
 
     console.log('%cCampusNet UI layout loaded successfully!', 'color:#0d6efd; font-weight:bold');
 };
