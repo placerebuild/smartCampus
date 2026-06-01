@@ -460,6 +460,49 @@ code {
     background: #f7fbff;
 }
 
+.device-modal-content {
+    border: none;
+    border-radius: 20px;
+    box-shadow: 0 18px 45px rgba(15, 35, 56, 0.22);
+}
+
+.device-modal-meta {
+    color: #5f7590;
+    font-size: 0.9rem;
+}
+
+.device-detail-section {
+    margin-bottom: 1.2rem;
+}
+
+.device-metric-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 0.75rem;
+}
+
+.device-metric-card {
+    border: 1px solid #dce8f5;
+    border-radius: 12px;
+    background: #f7fbff;
+    padding: 0.65rem 0.8rem;
+}
+
+.device-metric-label {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #5e7692;
+    font-weight: 700;
+}
+
+.device-metric-value {
+    display: block;
+    margin-top: 0.2rem;
+    font-weight: 700;
+    color: #0f2338;
+}
+
 .sidebar .nav-item {
     opacity: 0;
     animation: nav-in 0.45s ease forwards;

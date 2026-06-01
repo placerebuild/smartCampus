@@ -1,3 +1,4 @@
+// Core modules and third-party dependencies
 const path = require('path');
 const { exec } = require('child_process');
 const os = require('os');
@@ -11,11 +12,14 @@ const ping = require('ping');
 const snmp = require('net-snmp');
 const { Server } = require('socket.io');
 
+// Load environment variables from server/.env
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 
+// Express app and HTTP server wiring
 const app = express();
 const PORT = process.env.PORT || 4000;
 const httpServer = http.createServer(app);
+// Socket.IO server for real-time topology updates
 const io = new Server(httpServer, {
   cors: {
     origin: true,
@@ -23,6 +27,7 @@ const io = new Server(httpServer, {
   }
 });
 
+// Runtime configuration from environment
 const DB_HOST = process.env.DB_HOST || 'localhost';
 const DB_PORT = Number(process.env.DB_PORT || 3306);
 const DB_USER = process.env.DB_USER || 'root';
@@ -48,6 +53,13 @@ const DISCOVERY_MAX_HOSTS = Number(process.env.DISCOVERY_MAX_HOSTS || 512);
 const DISCOVERY_CONCURRENCY = Number(process.env.DISCOVERY_CONCURRENCY || 30);
 const DISCOVERY_PING_TIMEOUT_SEC = Number(process.env.DISCOVERY_PING_TIMEOUT_SEC || 1);
 
+
+// Scheduler settings for automated data collection
+const SCHEDULED_SCANS_ENABLED = parseBoolean(process.env.SCHEDULED_SCANS_ENABLED, true);
+const ROUTER_SCAN_INTERVAL_MS = Number(process.env.ROUTER_SCAN_INTERVAL_MS || 15000);
+const DISCOVERY_SCAN_INTERVAL_MS = Number(process.env.DISCOVERY_SCAN_INTERVAL_MS || 5 * 60 * 1000);
+
+// MySQL connection pool
 const dbPool = mysql.createPool({
   host: DB_HOST,
   port: DB_PORT,
@@ -59,6 +71,7 @@ const dbPool = mysql.createPool({
   queueLimit: 0
 });
 
+// HTTP middleware and session configuration
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json({ limit: '64kb' }));
 app.use(session({
@@ -73,42 +86,58 @@ app.use(session({
   }
 }));
 
+// Initial socket handshake
 io.on('connection', (socket) => {
   socket.emit('topology:hello', { ok: true, time: new Date().toISOString() });
 });
 
+// Input validation patterns
 const NAME_REGEX = /^[A-Za-z\s]+$/;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
 
+// Parse boolean-like strings with a default fallback
 function parseBoolean(value, defaultValue) {
   if (value === undefined || value === null || value === '') return defaultValue;
   const normalized = String(value).trim().toLowerCase();
   return ['1', 'true', 'yes', 'on'].includes(normalized);
 }
 
+function parseRequiredBoolean(value) {
+  if (value === undefined || value === null || value === '') return null;
+  const normalized = String(value).trim().toLowerCase();
+  if (['1', 'true', 'yes', 'on'].includes(normalized)) return true;
+  if (['0', 'false', 'no', 'off'].includes(normalized)) return false;
+  return null;
+}
+
+// Convert empty strings to null for DB storage
 function normalizeOptional(value) {
   const trimmed = typeof value === 'string' ? value.trim() : value;
   if (trimmed === undefined || trimmed === null || trimmed === '') return null;
   return trimmed;
 }
 
+// Normalize email values for comparisons
 function normalizeEmail(value) {
   if (typeof value !== 'string') return '';
   return value.trim().toLowerCase();
 }
 
+// Trim name values and guard against non-strings
 function normalizeName(value) {
   if (typeof value !== 'string') return '';
   return value.trim();
 }
 
+// Build a full name string from first/last values
 function buildFullName(firstName, lastName) {
   const safeFirst = normalizeName(firstName);
   const safeLast = normalizeName(lastName);
   return `${safeFirst} ${safeLast}`.trim();
 }
 
+// Enforce session authentication on protected routes
 function requireAuth(req, res, next) {
   if (!req.session || !req.session.user) {
     return res.status(401).json({ error: 'Not authenticated.' });
@@ -116,6 +145,7 @@ function requireAuth(req, res, next) {
   return next();
 }
 
+// Network helpers and SNMP OID mapping
 const IP_V4_REGEX = /^(25[0-5]|2[0-4]\d|1?\d?\d)(\.(25[0-5]|2[0-4]\d|1?\d?\d)){3}$/;
 const SNMP_OIDS = {
   sysDescr: '1.3.6.1.2.1.1.1.0',
@@ -129,14 +159,17 @@ const SNMP_OID_TO_KEY = Object.entries(SNMP_OIDS).reduce((acc, [key, oid]) => {
   return acc;
 }, {});
 
+// Validate IPv4 address strings
 function isValidIp(value) {
   return typeof value === 'string' && IP_V4_REGEX.test(value.trim());
 }
 
+// Convert dotted IPv4 string to integer
 function ipToInt(ip) {
   return ip.split('.').reduce((acc, octet) => (acc << 8) + Number(octet), 0) >>> 0;
 }
 
+// Convert integer to dotted IPv4 string
 function intToIp(intValue) {
   return [
     (intValue >>> 24) & 255,
@@ -146,6 +179,7 @@ function intToIp(intValue) {
   ].join('.');
 }
 
+// Count set bits for netmask conversion
 function countBits(value) {
   let count = 0;
   let num = value >>> 0;
@@ -156,11 +190,13 @@ function countBits(value) {
   return count;
 }
 
+// Convert dotted netmask to CIDR prefix
 function netmaskToPrefix(netmask) {
   if (!isValidIp(netmask)) return null;
   return netmask.split('.').reduce((acc, octet) => acc + countBits(Number(octet)), 0);
 }
 
+// Build a CIDR string from local IP and netmask
 function buildCidrFromIpNetmask(ip, netmask) {
   const prefix = netmaskToPrefix(netmask);
   if (prefix === null || !isValidIp(ip)) return null;
@@ -168,6 +204,7 @@ function buildCidrFromIpNetmask(ip, netmask) {
   return `${intToIp(networkInt)}/${prefix}`;
 }
 
+// Read local IPv4 address and netmask
 function getLocalNetworkInfo() {
   const interfaces = os.networkInterfaces();
   for (const name of Object.keys(interfaces)) {
@@ -180,6 +217,7 @@ function getLocalNetworkInfo() {
   return null;
 }
 
+// Resolve the CIDR used for discovery scans
 function resolveDiscoveryCidr() {
   if (NETWORK_CIDR) return NETWORK_CIDR;
 
@@ -197,6 +235,7 @@ function resolveDiscoveryCidr() {
   return null;
 }
 
+// Parse CIDR into numeric network details
 function parseCidr(cidr) {
   const [baseIp, prefixValue] = String(cidr || '').split('/');
   const prefix = Number(prefixValue);
@@ -212,6 +251,7 @@ function parseCidr(cidr) {
   return { baseIp, prefix, baseInt, networkInt, totalHosts };
 }
 
+// Expand CIDR into a list of host IPs
 function expandCidr(cidr, maxHosts) {
   const parsed = parseCidr(cidr);
   if (!parsed) return [];
@@ -229,6 +269,7 @@ function expandCidr(cidr, maxHosts) {
   return hosts;
 }
 
+// Resolve router target IP from query or config
 function resolveTargetIp(req) {
   const rawTarget = typeof req.query.target === 'string' ? req.query.target.trim() : '';
   if (rawTarget) {
@@ -238,10 +279,12 @@ function resolveTargetIp(req) {
   return isValidIp(ROUTER_IP) ? ROUTER_IP : null;
 }
 
+// Escape regex characters in string literals
 function escapeRegex(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+// Normalize SNMP values to strings or null
 function normalizeSnmpValue(value) {
   if (value === null || value === undefined) return null;
   if (Buffer.isBuffer(value)) return value.toString();
@@ -251,6 +294,7 @@ function normalizeSnmpValue(value) {
   return String(value);
 }
 
+// Resolve device status from a scan snapshot
 function resolveStatus(snapshot) {
   if (snapshot && snapshot.icmp && snapshot.icmp.ok) {
     return snapshot.icmp.alive ? 'Online' : 'Offline';
@@ -258,6 +302,7 @@ function resolveStatus(snapshot) {
   return 'Warning';
 }
 
+// Infer which scan method produced a snapshot
 function deriveScanMethod(snapshot) {
   if (snapshot && snapshot.snmp && snapshot.snmp.ok) return 'SNMP';
   if (snapshot && snapshot.icmp && snapshot.icmp.ok) return 'PING';
@@ -265,6 +310,7 @@ function deriveScanMethod(snapshot) {
   return 'Other';
 }
 
+// Build a compact connectivity summary for logging
 function buildConnectivityDetails(snapshot) {
   const parts = [];
 
@@ -288,6 +334,7 @@ function buildConnectivityDetails(snapshot) {
   return `${details.slice(0, 252)}...`;
 }
 
+// Find an existing device by IP or MAC address
 async function findDeviceByIpOrMac(ip, mac) {
   const [byIp] = await dbPool.execute(
     'SELECT * FROM DEVICE WHERE IPAddress = ? LIMIT 1',
@@ -312,6 +359,7 @@ async function findDeviceByIpOrMac(ip, mac) {
   return null;
 }
 
+// Insert a device scan event into DEVICE_LOG
 async function insertDeviceLog(deviceId, snapshot, status, ipAddress) {
   const details = buildConnectivityDetails(snapshot);
   const scanMethod = deriveScanMethod(snapshot);
@@ -322,6 +370,7 @@ async function insertDeviceLog(deviceId, snapshot, status, ipAddress) {
   );
 }
 
+// Upsert a router scan snapshot into DEVICE
 async function upsertDeviceSnapshot(snapshot) {
   if (!snapshot || !snapshot.target) return null;
 
@@ -388,6 +437,7 @@ async function upsertDeviceSnapshot(snapshot) {
   return result.insertId;
 }
 
+// Upsert a discovered endpoint into DEVICE
 async function upsertDiscoveredDevice(entry) {
   if (!entry || !entry.ip) return null;
 
@@ -450,11 +500,13 @@ async function upsertDiscoveredDevice(entry) {
   return result.insertId;
 }
 
+// Format location labels for UI output
 function formatLocationLabel(row) {
   const parts = [row.BuildingName, row.Floor, row.Room].filter(Boolean);
   return parts.length ? parts.join(' / ') : '';
 }
 
+// Map DB rows into device API payloads
 function mapDeviceRow(row) {
   return {
     id: row.DeviceID,
@@ -471,6 +523,7 @@ function mapDeviceRow(row) {
   };
 }
 
+// Map DB rows into topology payloads
 function mapTopologyRow(row) {
   return {
     id: row.IPAddress,
@@ -487,6 +540,7 @@ function mapTopologyRow(row) {
   };
 }
 
+// Merge two device arrays without duplicate IDs
 function mergeTopologyDevices(primary, extras) {
   const map = new Map();
   (primary || []).forEach(device => {
@@ -502,6 +556,7 @@ function mergeTopologyDevices(primary, extras) {
   return Array.from(map.values());
 }
 
+// Convert ARP discovery entries to device objects
 function buildDiscoveredDevice(entry) {
   const status = entry && entry.alive === false ? 'Warning' : 'Online';
   return {
@@ -519,6 +574,7 @@ function buildDiscoveredDevice(entry) {
   };
 }
 
+// Resolve router IP from config or device list
 function resolveRouterIp(devices) {
   if (isValidIp(ROUTER_IP)) return ROUTER_IP;
   const router = (devices || []).find(device =>
@@ -527,6 +583,7 @@ function resolveRouterIp(devices) {
   return router ? router.ip : null;
 }
 
+// Build a router device object for topology
 function buildRouterDevice(routerIp, connectedEntries) {
   const connectedIps = new Set((connectedEntries || []).map(entry => entry.ip));
   const status = connectedIps.has(routerIp) ? 'Online' : 'Warning';
@@ -545,6 +602,7 @@ function buildRouterDevice(routerIp, connectedEntries) {
   };
 }
 
+// Build topology links between router and devices
 function buildRouterLinks(routerIp, connectedEntries, devices) {
   if (!routerIp) return [];
   const deviceMap = new Map((devices || []).map(device => [String(device.id), device]));
@@ -568,12 +626,14 @@ function buildRouterLinks(routerIp, connectedEntries, devices) {
   return links;
 }
 
+// Read the current ARP table entries
 async function getConnectedArpEntries() {
   const table = await readArpTable();
   if (!table.ok) return [];
   return parseArpEntries(table.output);
 }
 
+// Build the topology payload from DB and ARP data
 async function fetchTopologyPayload(connectedEntries) {
   const [rows] = await dbPool.execute(`
     SELECT
@@ -607,6 +667,7 @@ async function fetchTopologyPayload(connectedEntries) {
   return { devices, links };
 }
 
+// Broadcast topology updates over Socket.IO
 async function emitTopologyUpdate(reason, connectedEntries) {
   try {
     const payload = await fetchTopologyPayload(connectedEntries);
@@ -620,11 +681,13 @@ async function emitTopologyUpdate(reason, connectedEntries) {
   }
 }
 
+// Resolve SNMP version enum for net-snmp
 function getSnmpVersion() {
   if (SNMP_VERSION === '1') return snmp.Version1;
   return snmp.Version2c;
 }
 
+// Query SNMP OIDs for device metadata
 function fetchSnmpSnapshot(targetIp) {
   return new Promise((resolve) => {
     if (!SNMP_ENABLED) {
@@ -663,6 +726,7 @@ function fetchSnmpSnapshot(targetIp) {
   });
 }
 
+// Ping a host with ICMP to get reachability
 async function fetchIcmpSnapshot(targetIp) {
   try {
     const result = await ping.promise.probe(targetIp, {
@@ -681,6 +745,7 @@ async function fetchIcmpSnapshot(targetIp) {
   }
 }
 
+// Read the system ARP table via CLI
 function readArpTable() {
   return new Promise((resolve) => {
     exec('arp -a', { windowsHide: true }, (error, stdout) => {
@@ -693,6 +758,7 @@ function readArpTable() {
   });
 }
 
+// Parse a single ARP entry for a target IP
 function parseArpEntry(output, targetIp) {
   const pattern = new RegExp(`^\\s*${escapeRegex(targetIp)}\\s+([0-9a-f:-]{11,})\\s+\\w+`, 'im');
   const match = output.match(pattern);
@@ -700,6 +766,7 @@ function parseArpEntry(output, targetIp) {
   return { ip: targetIp, mac: match[1].toLowerCase() };
 }
 
+// Parse all ARP entries from CLI output
 function parseArpEntries(output) {
   const entries = [];
   const pattern = /^\s*([0-9.]+)\s+([0-9a-f:-]{11,})\s+\w+/gim;
@@ -716,6 +783,7 @@ function parseArpEntries(output) {
   return entries;
 }
 
+// Read ARP and extract the entry for target IP
 async function fetchArpSnapshot(targetIp) {
   try {
     const table = await readArpTable();
@@ -727,6 +795,7 @@ async function fetchArpSnapshot(targetIp) {
   }
 }
 
+// Run async workers with concurrency limits
 async function runWithConcurrency(items, limit, worker) {
   let index = 0;
   const results = [];
@@ -742,6 +811,7 @@ async function runWithConcurrency(items, limit, worker) {
   return results;
 }
 
+// ICMP ping wrapper for discovery scans
 async function pingHost(ip) {
   try {
     const result = await ping.promise.probe(ip, {
@@ -754,6 +824,7 @@ async function pingHost(ip) {
   }
 }
 
+// Discover devices in the target subnet
 async function discoverNetworkDevices(cidrOverride) {
   const cidr = cidrOverride || resolveDiscoveryCidr();
   if (!cidr) {
@@ -794,10 +865,132 @@ async function discoverNetworkDevices(cidrOverride) {
   };
 }
 
+// ================== Automated Monitoring Scheduler ==================
+// Scheduler state to prevent overlapping scans
+let scheduledRouterScanTimer = null;
+let scheduledDiscoveryScanTimer = null;
+let scheduledRouterInFlight = false;
+let scheduledDiscoveryInFlight = false;
+let scanningEnabled = SCHEDULED_SCANS_ENABLED;
+
+function setScanningEnabled(enabled) {
+  scanningEnabled = Boolean(enabled);
+  if (scanningEnabled) {
+    startScheduledScans();
+  } else {
+    stopScheduledScans();
+  }
+  return scanningEnabled;
+}
+
+// Resolve the default router IP for scheduled scans
+function resolveRouterTarget() {
+  return isValidIp(ROUTER_IP) ? ROUTER_IP : null;
+}
+
+// Run a scheduled router scan using ICMP, ARP, and SNMP
+async function runScheduledRouterScan() {
+  if (!scanningEnabled) return;
+  // Avoid overlapping router scans
+  if (scheduledRouterInFlight) return;
+  scheduledRouterInFlight = true;
+
+  try {
+    // Resolve the router IP target
+    const target = resolveRouterTarget();
+    if (!target) {
+      console.warn('Scheduled router scan skipped: invalid router IP.');
+      return;
+    }
+
+    // Collect ICMP, ARP, and SNMP snapshots
+    const icmp = await fetchIcmpSnapshot(target);
+    const arp = await fetchArpSnapshot(target);
+    const snmpSnapshot = await fetchSnmpSnapshot(target);
+
+    // Build the scan snapshot payload
+    const snapshot = {
+      target,
+      scannedAt: new Date().toISOString(),
+      icmp,
+      arp,
+      snmp: snmpSnapshot
+    };
+
+    // Persist the scan and broadcast topology updates
+    await upsertDeviceSnapshot(snapshot);
+    emitTopologyUpdate('router-scan-scheduled');
+  } catch (error) {
+    console.error('Scheduled router scan error:', error);
+  } finally {
+    scheduledRouterInFlight = false;
+  }
+}
+
+// Run a scheduled network discovery scan using ICMP and ARP
+async function runScheduledDiscoveryScan() {
+  if (!scanningEnabled) return;
+  // Avoid overlapping discovery scans
+  if (scheduledDiscoveryInFlight) return;
+  scheduledDiscoveryInFlight = true;
+
+  try {
+    // Execute discovery across the resolved subnet
+    const result = await discoverNetworkDevices();
+    if (!result.ok) {
+      console.warn('Scheduled discovery scan failed:', result.error || 'Unknown error');
+      return;
+    }
+
+    // Broadcast the discovery update to the topology view
+    emitTopologyUpdate('network-discovery-scheduled', result.discovered);
+  } catch (error) {
+    console.error('Scheduled discovery scan error:', error);
+  } finally {
+    scheduledDiscoveryInFlight = false;
+  }
+}
+
+// Start the automated monitoring schedules
+function startScheduledScans() {
+  // Stop existing timers before restarting
+  stopScheduledScans();
+
+  if (!scanningEnabled) {
+    console.log('Scheduled scans disabled by settings.');
+    return;
+  }
+
+  // Kick off immediate scans for initial data
+  runScheduledRouterScan();
+  runScheduledDiscoveryScan();
+
+  // Schedule periodic router scans
+  scheduledRouterScanTimer = setInterval(runScheduledRouterScan, ROUTER_SCAN_INTERVAL_MS);
+
+  // Schedule periodic discovery scans
+  scheduledDiscoveryScanTimer = setInterval(runScheduledDiscoveryScan, DISCOVERY_SCAN_INTERVAL_MS);
+}
+
+// Stop the automated monitoring schedules
+function stopScheduledScans() {
+  if (scheduledRouterScanTimer) {
+    clearInterval(scheduledRouterScanTimer);
+    scheduledRouterScanTimer = null;
+  }
+
+  if (scheduledDiscoveryScanTimer) {
+    clearInterval(scheduledDiscoveryScanTimer);
+    scheduledDiscoveryScanTimer = null;
+  }
+}
+
+// Health check endpoint
 app.get('/api/health', (req, res) => {
   res.json({ ok: true, time: new Date().toISOString() });
 });
 
+// Return the authenticated session user
 app.get('/api/auth/me', (req, res) => {
   if (!req.session || !req.session.user) {
     return res.status(401).json({ error: 'Not authenticated.' });
@@ -805,6 +998,7 @@ app.get('/api/auth/me', (req, res) => {
   return res.json(req.session.user);
 });
 
+// Register a new user account
 app.post('/api/auth/register', async (req, res) => {
   const { firstName, lastName, email, password } = req.body || {};
   const safeEmail = normalizeEmail(email);
@@ -858,6 +1052,7 @@ app.post('/api/auth/register', async (req, res) => {
   }
 });
 
+// Authenticate a user and create a session
 app.post('/api/auth/login', async (req, res) => {
   const { email, password } = req.body || {};
   const safeEmail = normalizeEmail(email);
@@ -902,6 +1097,7 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
+// End the current session
 app.post('/api/auth/logout', (req, res) => {
   if (!req.session) {
     return res.json({ ok: true });
@@ -918,6 +1114,7 @@ app.post('/api/auth/logout', (req, res) => {
   });
 });
 
+// List devices for dashboard and inventory views
 app.get('/api/devices', requireAuth, async (req, res) => {
   try {
     const [rows] = await dbPool.execute(`
@@ -944,6 +1141,7 @@ app.get('/api/devices', requireAuth, async (req, res) => {
   }
 });
 
+// Return topology payload for the map view
 app.get('/api/topology', requireAuth, async (req, res) => {
   try {
     const payload = await fetchTopologyPayload();
@@ -954,7 +1152,27 @@ app.get('/api/topology', requireAuth, async (req, res) => {
   }
 });
 
+// Get current scanning status
+app.get('/api/settings/scanning', requireAuth, (req, res) => {
+  return res.json({ enabled: scanningEnabled });
+});
+
+// Update scanning status
+app.put('/api/settings/scanning', requireAuth, (req, res) => {
+  const parsed = parseRequiredBoolean(req.body?.enabled);
+  if (parsed === null) {
+    return res.status(400).json({ error: 'Enabled must be a boolean.' });
+  }
+
+  const enabled = setScanningEnabled(parsed);
+  return res.json({ enabled });
+});
+
+// Trigger an on-demand discovery scan
 app.post('/api/monitor/discover', requireAuth, async (req, res) => {
+  if (!scanningEnabled) {
+    return res.status(409).json({ error: 'Scanning is disabled in settings.' });
+  }
   const cidrOverride = typeof req.body?.cidr === 'string' ? req.body.cidr.trim() : '';
 
   try {
@@ -971,7 +1189,11 @@ app.post('/api/monitor/discover', requireAuth, async (req, res) => {
   }
 });
 
+// Trigger an on-demand router scan
 app.get('/api/monitor/router', requireAuth, async (req, res) => {
+  if (!scanningEnabled) {
+    return res.status(409).json({ error: 'Scanning is disabled in settings.' });
+  }
   const target = resolveTargetIp(req);
   if (!target) {
     return res.status(400).json({ error: 'Invalid target IP address.' });
@@ -1000,6 +1222,7 @@ app.get('/api/monitor/router', requireAuth, async (req, res) => {
   return res.json(snapshot);
 });
 
+// Update the authenticated user's profile
 app.put('/api/auth/profile', requireAuth, async (req, res) => {
   const { firstName, lastName, contactNumber } = req.body || {};
   const safeFirstName = normalizeName(firstName);
@@ -1031,6 +1254,9 @@ app.put('/api/auth/profile', requireAuth, async (req, res) => {
   }
 });
 
+// Start the server and begin scheduled scans
 httpServer.listen(PORT, () => {
   console.log(`SmartCampus API running on http://localhost:${PORT}`);
+  // Start automated data collection after the server is up
+  startScheduledScans();
 });

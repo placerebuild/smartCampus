@@ -8,6 +8,27 @@ const MONITOR_INTERVAL_MS = Number(window.MONITOR_INTERVAL_MS || 15000);
 
 let monitorTimer = null;
 let monitorInFlight = false;
+let monitoringEnabledCache = null;
+
+async function resolveMonitoringEnabled() {
+    if (monitoringEnabledCache !== null) return monitoringEnabledCache;
+
+    try {
+        const response = await fetch(`${MONITOR_API_BASE}/api/settings/scanning`, { credentials: 'include' });
+        if (response.ok) {
+            const payload = await response.json();
+            if (payload && typeof payload.enabled === 'boolean') {
+                monitoringEnabledCache = payload.enabled;
+                return monitoringEnabledCache;
+            }
+        }
+    } catch (error) {
+        console.warn('Monitoring status check failed:', error.message || error);
+    }
+
+    monitoringEnabledCache = true;
+    return monitoringEnabledCache;
+}
 
 function buildMonitorUrl() {
     const url = new URL(`${MONITOR_API_BASE}/api/monitor/router`);
@@ -71,6 +92,7 @@ function buildRouterDevice(snapshot) {
         name: routerName,
         type: ROUTER_TYPE,
         ip: snapshot.target,
+        mac: macAddress || '',
         location: macAddress ? `${ROUTER_LOCATION} (${macAddress})` : ROUTER_LOCATION,
         status: statusFromSnapshot(snapshot),
         lastSeen: formatLastSeenValue(snapshot.scannedAt),
@@ -156,6 +178,7 @@ function shouldStartMonitoring() {
 }
 
 async function runMonitorCycle() {
+    if (monitoringEnabledCache === false) return;
     if (monitorInFlight) return;
     monitorInFlight = true;
 
@@ -183,7 +206,10 @@ async function runMonitorCycle() {
     }
 }
 
-function startMonitoring() {
+async function startMonitoring() {
+    const isEnabled = await resolveMonitoringEnabled();
+    if (!isEnabled) return;
+
     runMonitorCycle();
     if (monitorTimer) clearInterval(monitorTimer);
     monitorTimer = setInterval(runMonitorCycle, MONITOR_INTERVAL_MS);

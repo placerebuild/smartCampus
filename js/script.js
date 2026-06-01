@@ -37,6 +37,49 @@ function formatLastSeen(value) {
     return date.toLocaleString();
 }
 
+function formatDeviceValue(value, fallback = 'N/A') {
+    if (value === undefined || value === null || value === '') return fallback;
+    return value;
+}
+
+function resolveDeviceMetric(device, keys) {
+    if (!device) return null;
+    for (const key of keys) {
+        const value = device[key];
+        if (value !== undefined && value !== null && value !== '') {
+            return value;
+        }
+    }
+    return null;
+}
+
+function formatMetricValue(value, unit) {
+    if (value === undefined || value === null || value === '') return 'N/A';
+    if (typeof value === 'number' && Number.isFinite(value)) {
+        return unit ? `${value} ${unit}` : `${value}`;
+    }
+    return value;
+}
+
+function getDeviceKey(device) {
+    if (!device) return '';
+    const key = device.id || device.ip;
+    return key ? String(key) : '';
+}
+
+function findDeviceByKey(key) {
+    if (!key) return null;
+    return devicesData.find(device => getDeviceKey(device) === key || String(device.ip || '') === key) || null;
+}
+
+function buildStatusMarkup(status) {
+    const statusValue = status || 'Unknown';
+    let statusClass = 'text-warning';
+    if (statusValue === 'Online') statusClass = 'text-success';
+    if (statusValue === 'Offline') statusClass = 'text-danger';
+    return `<span class="${statusClass}"><i class="fas fa-circle"></i> ${statusValue}</span>`;
+}
+
 function applyDeviceResults(devices) {
     if (!Array.isArray(devices)) return;
     devicesData = devices.map(device => ({
@@ -56,25 +99,150 @@ function populateDevicesTable() {
 
     tbody.innerHTML = '';
     devicesData.forEach(dev => {
-        const statusValue = dev.status || 'Unknown';
-        let statusHTML = `<span class="text-warning"><i class="fas fa-circle"></i> ${statusValue}</span>`;
-
-        if (statusValue === 'Online') {
-            statusHTML = `<span class="text-success"><i class="fas fa-circle"></i> Online</span>`;
-        } else if (statusValue === 'Offline') {
-            statusHTML = `<span class="text-danger"><i class="fas fa-circle"></i> Offline</span>`;
-        }
+        const statusHTML = buildStatusMarkup(dev.status);
+        const deviceKey = getDeviceKey(dev);
+        const macValue = formatDeviceValue(dev.mac);
+        const macCell = macValue === 'N/A'
+            ? '<span class="text-muted">N/A</span>'
+            : `<code>${macValue}</code>`;
 
         tbody.innerHTML += `
             <tr>
-                <td><strong>${dev.name}</strong></td>
-                <td>${dev.type}</td>
-                <td><code>${dev.ip}</code></td>
-                <td>${dev.location}</td>
+                <td><strong>${formatDeviceValue(dev.name || dev.ip || 'Device', 'Device')}</strong></td>
+                <td>${formatDeviceValue(dev.type)}</td>
+                <td><code>${formatDeviceValue(dev.ip)}</code></td>
+                <td>${macCell}</td>
+                <td>${formatDeviceValue(dev.location)}</td>
                 <td>${statusHTML}</td>
-                <td>${dev.lastSeen}</td>
-                <td><button class="btn btn-sm btn-outline-primary">View</button></td>
+                <td>${formatDeviceValue(dev.lastSeen)}</td>
+                <td>
+                    <button class="btn btn-sm btn-outline-primary" data-device-action="view" data-device-key="${deviceKey}">View</button>
+                </td>
             </tr>`;
+    });
+}
+
+function openDeviceDetailsModal(device) {
+    const existing = document.getElementById('deviceDetailsModal');
+    if (existing) existing.remove();
+
+    const selected = device || {};
+    const name = formatDeviceValue(selected.name || selected.ip || 'Device', 'Device');
+    const type = formatDeviceValue(selected.type);
+    const ip = formatDeviceValue(selected.ip);
+    const mac = formatDeviceValue(selected.mac);
+    const location = formatDeviceValue(selected.location);
+    const building = formatDeviceValue(selected.building);
+    const floor = formatDeviceValue(selected.floor);
+    const room = formatDeviceValue(selected.room);
+    const statusMarkup = buildStatusMarkup(selected.status);
+    const lastSeen = formatDeviceValue(selected.lastSeen);
+    const description = formatDeviceValue(selected.description, '');
+
+    const bandwidth = formatMetricValue(resolveDeviceMetric(selected, [
+        'bandwidth',
+        'linkBandwidth',
+        'uplinkBandwidth',
+        'downlinkBandwidth'
+    ]));
+    const speed = formatMetricValue(resolveDeviceMetric(selected, [
+        'speed',
+        'linkSpeed',
+        'uplinkSpeed',
+        'downlinkSpeed'
+    ]));
+    const latency = formatMetricValue(resolveDeviceMetric(selected, [
+        'latency',
+        'responseTime',
+        'icmpTimeMs'
+    ]), 'ms');
+    const traffic = formatMetricValue(resolveDeviceMetric(selected, [
+        'traffic',
+        'throughput',
+        'utilization'
+    ]));
+
+    const modalHTML = `
+        <div class="modal fade" id="deviceDetailsModal" tabindex="-1" aria-labelledby="deviceDetailsLabel" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered modal-lg">
+                <div class="modal-content device-modal-content">
+                    <div class="modal-header border-0 pb-0">
+                        <div>
+                            <h5 class="modal-title" id="deviceDetailsLabel" style="font-family:'Sora',sans-serif;">${name}</h5>
+                            <p class="device-modal-meta mb-0">${type} - ${ip}</p>
+                        </div>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body pt-3">
+                        <div class="device-detail-section">
+                            <h6 class="section-title mb-2">Device Overview</h6>
+                            <ul class="device-detail-list">
+                                <li><span class="device-detail-label">Name</span><strong>${name}</strong></li>
+                                <li><span class="device-detail-label">Type</span><span>${type}</span></li>
+                                <li><span class="device-detail-label">IP Address</span><code>${ip}</code></li>
+                                <li><span class="device-detail-label">MAC Address</span><span>${mac}</span></li>
+                                <li><span class="device-detail-label">Location</span><span>${location}</span></li>
+                                <li><span class="device-detail-label">Building</span><span>${building}</span></li>
+                                <li><span class="device-detail-label">Floor</span><span>${floor}</span></li>
+                                <li><span class="device-detail-label">Room/Area</span><span>${room}</span></li>
+                                <li><span class="device-detail-label">Status</span>${statusMarkup}</li>
+                                <li><span class="device-detail-label">Last Seen</span><span>${lastSeen}</span></li>
+                            </ul>
+                        </div>
+                        <div class="device-detail-section">
+                            <h6 class="section-title mb-2">Performance</h6>
+                            <div class="device-metric-grid">
+                                <div class="device-metric-card">
+                                    <span class="device-metric-label">Bandwidth</span>
+                                    <strong class="device-metric-value">${bandwidth}</strong>
+                                </div>
+                                <div class="device-metric-card">
+                                    <span class="device-metric-label">Link Speed</span>
+                                    <strong class="device-metric-value">${speed}</strong>
+                                </div>
+                                <div class="device-metric-card">
+                                    <span class="device-metric-label">Latency</span>
+                                    <strong class="device-metric-value">${latency}</strong>
+                                </div>
+                                <div class="device-metric-card">
+                                    <span class="device-metric-label">Traffic Load</span>
+                                    <strong class="device-metric-value">${traffic}</strong>
+                                </div>
+                            </div>
+                        </div>
+                        ${description ? `
+                        <div class="device-detail-section">
+                            <h6 class="section-title mb-2">Notes</h6>
+                            <p class="text-muted mb-0">${description}</p>
+                        </div>
+                        ` : ''}
+                    </div>
+                </div>
+            </div>
+        </div>`;
+
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+
+    const modalEl = document.getElementById('deviceDetailsModal');
+    const modal = new bootstrap.Modal(modalEl);
+    modalEl.addEventListener('hidden.bs.modal', function () {
+        modalEl.remove();
+    });
+    modal.show();
+}
+
+function initDeviceTableActions() {
+    const table = document.getElementById('devices-table');
+    if (!table || table.dataset.actionsBound === 'true') return;
+    table.dataset.actionsBound = 'true';
+
+    table.addEventListener('click', event => {
+        const button = event.target.closest('[data-device-action="view"]');
+        if (!button) return;
+
+        const deviceKey = button.getAttribute('data-device-key');
+        const device = findDeviceByKey(deviceKey);
+        openDeviceDetailsModal(device);
     });
 }
 
@@ -385,27 +553,15 @@ function updateTopologyData(options = {}) {
 function applyTopologyLayout(viewMode) {
     if (!topologyNetwork) return;
 
-    if (viewMode === 'tree') {
-        topologyNetwork.setOptions({
-            layout: {
-                hierarchical: {
-                    enabled: true,
-                    direction: 'UD',
-                    sortMethod: 'hubsize',
-                    nodeSpacing: 140,
-                    levelSeparation: 130
-                }
-            },
-            physics: { enabled: false }
-        });
-        topologyNetwork.fit({ animation: { duration: 350 } });
-        return;
-    }
-
     if (viewMode === 'floor') {
         topologyNetwork.setOptions({
             layout: { hierarchical: { enabled: false } },
-            physics: { enabled: false }
+            physics: { enabled: false },
+            interaction: {
+                dragNodes: true,
+                dragView: true,
+                zoomView: true
+            }
         });
         return;
     }
@@ -422,6 +578,11 @@ function applyTopologyLayout(viewMode) {
                 springConstant: 0.08
             },
             stabilization: { iterations: 140 }
+        },
+        interaction: {
+            dragNodes: true,
+            dragView: true,
+            zoomView: true
         }
     });
 }
@@ -914,9 +1075,97 @@ async function loadSidebar() {
     }
 }
 
+function getSettingsApiBase() {
+    const host = window.location.hostname || 'localhost';
+    return window.MONITOR_API_BASE || `http://${host}:4000`;
+}
+
+async function fetchScanSettings() {
+    try {
+        const response = await fetch(`${getSettingsApiBase()}/api/settings/scanning`, {
+            credentials: 'include'
+        });
+        if (!response.ok) return null;
+        return response.json();
+    } catch (error) {
+        console.warn('Scan settings load failed:', error.message || error);
+        return null;
+    }
+}
+
+async function updateScanSettings(enabled) {
+    const response = await fetch(`${getSettingsApiBase()}/api/settings/scanning`, {
+        method: 'PUT',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled })
+    });
+
+    if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(payload.error || 'Unable to update scanning settings.');
+    }
+
+    return response.json();
+}
+
+function renderScanToggleStatus(enabled, statusEl) {
+    if (!statusEl) return;
+    statusEl.textContent = enabled ? 'Scanning is on.' : 'Scanning is off.';
+    statusEl.className = `text-${enabled ? 'success' : 'danger'} small d-block`;
+}
+
+async function initScanSettings() {
+    const toggle = document.getElementById('scanToggle');
+    if (!toggle) return;
+
+    const statusEl = document.getElementById('scan-toggle-status');
+    toggle.disabled = true;
+    if (statusEl) {
+        statusEl.textContent = 'Loading scanning status...';
+        statusEl.className = 'text-muted small d-block';
+    }
+
+    let enabled = true;
+    const settings = await fetchScanSettings();
+    if (settings && typeof settings.enabled === 'boolean') {
+        enabled = settings.enabled;
+    }
+
+    toggle.checked = enabled;
+    renderScanToggleStatus(enabled, statusEl);
+    toggle.disabled = false;
+
+    toggle.addEventListener('change', async () => {
+        const nextValue = toggle.checked;
+        toggle.disabled = true;
+        if (statusEl) {
+            statusEl.textContent = 'Saving...';
+            statusEl.className = 'text-muted small d-block';
+        }
+
+        try {
+            const payload = await updateScanSettings(nextValue);
+            const applied = payload && typeof payload.enabled === 'boolean' ? payload.enabled : nextValue;
+            toggle.checked = applied;
+            renderScanToggleStatus(applied, statusEl);
+        } catch (error) {
+            toggle.checked = !nextValue;
+            if (statusEl) {
+                statusEl.textContent = error.message || 'Unable to update scanning settings.';
+                statusEl.className = 'text-danger small d-block';
+            }
+        } finally {
+            toggle.disabled = false;
+        }
+    });
+}
+
 window.onload = async function () {
     await loadSidebar();
+    await initScanSettings();
     populateDevicesTable();
+    initDeviceTableActions();
     populateRecentAlerts();
     populateAlertsTable();
     populateReportsTable();
