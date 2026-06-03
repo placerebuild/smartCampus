@@ -9,9 +9,14 @@ const MONITOR_INTERVAL_MS = Number(window.MONITOR_INTERVAL_MS || 15000);
 let monitorTimer = null;
 let monitorInFlight = false;
 let monitoringEnabledCache = null;
+let monitoringEnabledCachedAt = 0;
+const MONITORING_CACHE_TTL_MS = 60000;
 
 async function resolveMonitoringEnabled() {
-    if (monitoringEnabledCache !== null) return monitoringEnabledCache;
+    const now = Date.now();
+    if (monitoringEnabledCache !== null && (now - monitoringEnabledCachedAt) < MONITORING_CACHE_TTL_MS) {
+        return monitoringEnabledCache;
+    }
 
     try {
         const response = await fetch(`${MONITOR_API_BASE}/api/settings/scanning`, { credentials: 'include' });
@@ -19,6 +24,7 @@ async function resolveMonitoringEnabled() {
             const payload = await response.json();
             if (payload && typeof payload.enabled === 'boolean') {
                 monitoringEnabledCache = payload.enabled;
+                monitoringEnabledCachedAt = Date.now();
                 return monitoringEnabledCache;
             }
         }
@@ -27,6 +33,7 @@ async function resolveMonitoringEnabled() {
     }
 
     monitoringEnabledCache = true;
+    monitoringEnabledCachedAt = Date.now();
     return monitoringEnabledCache;
 }
 
@@ -38,35 +45,24 @@ function buildMonitorUrl() {
     return url.toString();
 }
 
+async function handleApiError(response, defaultError) {
+    if (response.status === 401) return null;
+    if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(payload.error || defaultError);
+    }
+    return response.json();
+}
+
 async function fetchRouterSnapshot() {
     const url = buildMonitorUrl();
     const response = await fetch(url, { credentials: 'include' });
-
-    if (response.status === 401) {
-        return null;
-    }
-
-    if (!response.ok) {
-        const payload = await response.json().catch(() => ({}));
-        throw new Error(payload.error || 'Router monitor request failed.');
-    }
-
-    return response.json();
+    return handleApiError(response, 'Router monitor request failed.');
 }
 
 async function fetchDeviceList() {
     const response = await fetch(`${MONITOR_API_BASE}/api/devices`, { credentials: 'include' });
-
-    if (response.status === 401) {
-        return null;
-    }
-
-    if (!response.ok) {
-        const payload = await response.json().catch(() => ({}));
-        throw new Error(payload.error || 'Device list request failed.');
-    }
-
-    return response.json();
+    return handleApiError(response, 'Device list request failed.');
 }
 
 function statusFromSnapshot(snapshot) {
@@ -112,6 +108,24 @@ function updateDeviceTable(snapshot) {
     }
 }
 
+function updateDashboardMetrics(total, onlineCount, offlineCount, unknownCount, devicesToAlert) {
+    const totalEl = document.getElementById('total-devices');
+    const onlineEl = document.getElementById('online-count');
+    const offlineEl = document.getElementById('offline-count');
+
+    if (totalEl) totalEl.textContent = total;
+    if (onlineEl) onlineEl.textContent = onlineCount;
+    if (offlineEl) offlineEl.textContent = offlineCount;
+
+    if (typeof window.createStatusChart === 'function') {
+        window.createStatusChart(onlineCount, offlineCount, unknownCount);
+    }
+
+    if (typeof window.populateDashboardAlerts === 'function') {
+        window.populateDashboardAlerts(devicesToAlert);
+    }
+}
+
 function updateDashboard(snapshot) {
     const device = buildRouterDevice(snapshot);
     if (!device) return;
@@ -122,21 +136,7 @@ function updateDashboard(snapshot) {
     const unknownCount = status === 'Unknown' ? 1 : 0;
     const totalCount = onlineCount + offlineCount + unknownCount;
 
-    const totalEl = document.getElementById('total-devices');
-    const onlineEl = document.getElementById('online-count');
-    const offlineEl = document.getElementById('offline-count');
-
-    if (totalEl) totalEl.textContent = totalCount;
-    if (onlineEl) onlineEl.textContent = onlineCount;
-    if (offlineEl) offlineEl.textContent = offlineCount;
-
-    if (typeof window.createStatusChart === 'function') {
-        window.createStatusChart(onlineCount, offlineCount, unknownCount);
-    }
-
-    if (typeof window.populateDashboardAlerts === 'function') {
-        window.populateDashboardAlerts([device]);
-    }
+    updateDashboardMetrics(totalCount, onlineCount, offlineCount, unknownCount, [device]);
 }
 
 function updateUiFromDevices(devices) {
@@ -144,29 +144,13 @@ function updateUiFromDevices(devices) {
 
     if (typeof window.applyDeviceResults === 'function') {
         window.applyDeviceResults(devices);
-    } else if (typeof window.setDevicesData === 'function') {
-        window.setDevicesData(devices);
     }
 
     const onlineCount = devices.filter(device => device.status === 'Online').length;
     const offlineCount = devices.filter(device => device.status === 'Offline').length;
     const unknownCount = Math.max(0, devices.length - onlineCount - offlineCount);
 
-    const totalEl = document.getElementById('total-devices');
-    const onlineEl = document.getElementById('online-count');
-    const offlineEl = document.getElementById('offline-count');
-
-    if (totalEl) totalEl.textContent = devices.length;
-    if (onlineEl) onlineEl.textContent = onlineCount;
-    if (offlineEl) offlineEl.textContent = offlineCount;
-
-    if (typeof window.createStatusChart === 'function') {
-        window.createStatusChart(onlineCount, offlineCount, unknownCount);
-    }
-
-    if (typeof window.populateDashboardAlerts === 'function') {
-        window.populateDashboardAlerts(devices);
-    }
+    updateDashboardMetrics(devices.length, onlineCount, offlineCount, unknownCount, devices);
 }
 
 function shouldStartMonitoring() {
@@ -178,7 +162,8 @@ function shouldStartMonitoring() {
 }
 
 async function runMonitorCycle() {
-    if (monitoringEnabledCache === false) return;
+    const isEnabled = await resolveMonitoringEnabled();
+    if (!isEnabled) return;
     if (monitorInFlight) return;
     monitorInFlight = true;
 

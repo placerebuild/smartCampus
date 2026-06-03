@@ -1,12 +1,6 @@
 let devicesData = [];
-let deviceIdCounter = 1;
 
-function isValidIpAddress(value) {
-    if (typeof value !== 'string') return false;
-    const parts = value.trim().split('.');
-    if (parts.length !== 4) return false;
-    return parts.every(part => part !== '' && Number.isInteger(Number(part)) && Number(part) >= 0 && Number(part) <= 255);
-}
+
 
 function upsertDevice(device) {
     const index = devicesData.findIndex(item => item.ip === device.ip);
@@ -25,10 +19,6 @@ function upsertDevice(device) {
     devicesData.unshift(device);
 }
 
-function setScanStatusTone(target, tone) {
-    if (!target) return;
-    target.className = `small ${tone}`;
-}
 
 function formatLastSeen(value) {
     if (!value) return '';
@@ -40,6 +30,16 @@ function formatLastSeen(value) {
 function formatDeviceValue(value, fallback = 'N/A') {
     if (value === undefined || value === null || value === '') return fallback;
     return value;
+}
+
+function formatLocationLabel(building, floor, room) {
+    const parts = [building, floor, room].filter(part => part !== undefined && part !== null && part !== '');
+    return parts.length ? parts.join(' / ') : '';
+}
+
+function resolveLocationLabel(device) {
+    if (!device) return '';
+    return device.location || formatLocationLabel(device.building, device.floor, device.room);
 }
 
 function resolveDeviceMetric(device, keys) {
@@ -89,6 +89,7 @@ function applyDeviceResults(devices) {
     populateDevicesTable();
     setTopologyDevices(devices);
     updateTopologyData({ fit: false });
+    populateReportsTable();
 }
 
 
@@ -105,16 +106,17 @@ function populateDevicesTable() {
         const macCell = macValue === 'N/A'
             ? '<span class="text-muted">N/A</span>'
             : `<code>${macValue}</code>`;
+        const locationLabel = resolveLocationLabel(dev);
 
         tbody.innerHTML += `
-            <tr>
+            <tr data-device-row="${deviceKey}">
                 <td><strong>${formatDeviceValue(dev.name || dev.ip || 'Device', 'Device')}</strong></td>
                 <td>${formatDeviceValue(dev.type)}</td>
                 <td><code>${formatDeviceValue(dev.ip)}</code></td>
                 <td>${macCell}</td>
-                <td>${formatDeviceValue(dev.location)}</td>
-                <td>${statusHTML}</td>
-                <td>${formatDeviceValue(dev.lastSeen)}</td>
+                <td>${formatDeviceValue(locationLabel)}</td>
+                <td data-status-cell>${statusHTML}</td>
+                <td data-last-seen-cell>${formatDeviceValue(dev.lastSeen)}</td>
                 <td>
                     <button class="btn btn-sm btn-outline-primary" data-device-action="view" data-device-key="${deviceKey}">View</button>
                 </td>
@@ -131,36 +133,23 @@ function openDeviceDetailsModal(device) {
     const type = formatDeviceValue(selected.type);
     const ip = formatDeviceValue(selected.ip);
     const mac = formatDeviceValue(selected.mac);
-    const location = formatDeviceValue(selected.location);
+    const location = formatDeviceValue(resolveLocationLabel(selected));
     const building = formatDeviceValue(selected.building);
     const floor = formatDeviceValue(selected.floor);
     const room = formatDeviceValue(selected.room);
     const statusMarkup = buildStatusMarkup(selected.status);
     const lastSeen = formatDeviceValue(selected.lastSeen);
     const description = formatDeviceValue(selected.description, '');
+    const nameInput = selected.name ? String(selected.name) : '';
+    const typeInput = selected.type ? String(selected.type) : '';
+    const buildingInput = selected.building ? String(selected.building) : '';
+    const floorInput = selected.floor ? String(selected.floor) : '';
+    const roomInput = selected.room ? String(selected.room) : '';
+    const canEditLocation = Boolean(selected && selected.id);
 
-    const bandwidth = formatMetricValue(resolveDeviceMetric(selected, [
-        'bandwidth',
-        'linkBandwidth',
-        'uplinkBandwidth',
-        'downlinkBandwidth'
-    ]));
-    const speed = formatMetricValue(resolveDeviceMetric(selected, [
-        'speed',
-        'linkSpeed',
-        'uplinkSpeed',
-        'downlinkSpeed'
-    ]));
-    const latency = formatMetricValue(resolveDeviceMetric(selected, [
-        'latency',
-        'responseTime',
-        'icmpTimeMs'
-    ]), 'ms');
-    const traffic = formatMetricValue(resolveDeviceMetric(selected, [
-        'traffic',
-        'throughput',
-        'utilization'
-    ]));
+    const packetLoss = formatMetricValue(resolveDeviceMetric(selected, [
+        'packetLoss'
+    ]), '%');
 
     const modalHTML = `
         <div class="modal fade" id="deviceDetailsModal" tabindex="-1" aria-labelledby="deviceDetailsLabel" aria-hidden="true">
@@ -168,46 +157,89 @@ function openDeviceDetailsModal(device) {
                 <div class="modal-content device-modal-content">
                     <div class="modal-header border-0 pb-0">
                         <div>
-                            <h5 class="modal-title" id="deviceDetailsLabel" style="font-family:'Sora',sans-serif;">${name}</h5>
-                            <p class="device-modal-meta mb-0">${type} - ${ip}</p>
+                            <h5 class="modal-title" id="deviceDetailsLabel" style="font-family:'Sora',sans-serif;" data-device-field="title">${name}</h5>
+                            <p class="device-modal-meta mb-0" data-device-field="meta">${type} - ${ip}</p>
                         </div>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <div class="modal-body pt-3">
                         <div class="device-detail-section">
-                            <h6 class="section-title mb-2">Device Overview</h6>
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <h6 class="section-title mb-0">Device Overview</h6>
+                                <button type="button" class="btn btn-sm btn-outline-primary" data-device-action="toggle-location-edit" ${canEditLocation ? '' : 'disabled'}>Edit Details</button>
+                            </div>
                             <ul class="device-detail-list">
-                                <li><span class="device-detail-label">Name</span><strong>${name}</strong></li>
-                                <li><span class="device-detail-label">Type</span><span>${type}</span></li>
+                                <li><span class="device-detail-label">Name</span><strong data-device-field="name">${name}</strong></li>
+                                <li><span class="device-detail-label">Type</span><span data-device-field="type">${type}</span></li>
                                 <li><span class="device-detail-label">IP Address</span><code>${ip}</code></li>
                                 <li><span class="device-detail-label">MAC Address</span><span>${mac}</span></li>
-                                <li><span class="device-detail-label">Location</span><span>${location}</span></li>
-                                <li><span class="device-detail-label">Building</span><span>${building}</span></li>
-                                <li><span class="device-detail-label">Floor</span><span>${floor}</span></li>
-                                <li><span class="device-detail-label">Room/Area</span><span>${room}</span></li>
+                                <li><span class="device-detail-label">Location</span><span data-device-field="location">${location}</span></li>
+                                <li><span class="device-detail-label">Building</span><span data-device-field="building">${building}</span></li>
+                                <li><span class="device-detail-label">Floor</span><span data-device-field="floor">${floor}</span></li>
+                                <li><span class="device-detail-label">Room/Area</span><span data-device-field="room">${room}</span></li>
                                 <li><span class="device-detail-label">Status</span>${statusMarkup}</li>
                                 <li><span class="device-detail-label">Last Seen</span><span>${lastSeen}</span></li>
                             </ul>
+                            <form class="device-location-form d-none" data-device-form="location">
+                                <div class="row g-2">
+                                    <div class="col-md-6">
+                                        <label class="form-label small text-muted fw-semibold">Device Name</label>
+                                        <input class="form-control" name="deviceName" type="text" value="${nameInput}" ${canEditLocation ? 'required' : 'disabled'}>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label small text-muted fw-semibold">Device Type</label>
+                                        <input class="form-control" name="deviceType" type="text" value="${typeInput}" ${canEditLocation ? 'required' : 'disabled'}>
+                                    </div>
+                                </div>
+                                <div class="row g-2 mt-1">
+                                    <div class="col-md-4">
+                                        <label class="form-label small text-muted fw-semibold">Building</label>
+                                        <input class="form-control" name="building" type="text" value="${buildingInput}" ${canEditLocation ? 'required' : 'disabled'}>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label small text-muted fw-semibold">Floor</label>
+                                        <input class="form-control" name="floor" type="text" value="${floorInput}" ${canEditLocation ? 'required' : 'disabled'}>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label small text-muted fw-semibold">Room/Area</label>
+                                        <input class="form-control" name="room" type="text" value="${roomInput}" ${canEditLocation ? '' : 'disabled'}>
+                                    </div>
+                                </div>
+                                <div class="d-flex gap-2 mt-3">
+                                    <button class="btn btn-primary btn-sm" type="submit" ${canEditLocation ? '' : 'disabled'}>Save Changes</button>
+                                    <button class="btn btn-outline-secondary btn-sm" type="button" data-device-action="cancel-location-edit">Cancel</button>
+                                </div>
+                                <div class="small text-muted mt-2" data-device-location-hint></div>
+                                <div class="small text-danger mt-2 d-none" data-device-location-error></div>
+                            </form>
                         </div>
                         <div class="device-detail-section">
-                            <h6 class="section-title mb-2">Performance</h6>
-                            <div class="device-metric-grid">
-                                <div class="device-metric-card">
-                                    <span class="device-metric-label">Bandwidth</span>
-                                    <strong class="device-metric-value">${bandwidth}</strong>
-                                </div>
-                                <div class="device-metric-card">
-                                    <span class="device-metric-label">Link Speed</span>
-                                    <strong class="device-metric-value">${speed}</strong>
-                                </div>
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <h6 class="section-title mb-0">Performance (ICMP)</h6>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" data-device-action="re-ping" title="Ping again">
+                                    <i class="fas fa-sync-alt"></i> Ping
+                                </button>
+                            </div>
+                            <div class="device-metric-grid" data-device-metrics>
                                 <div class="device-metric-card">
                                     <span class="device-metric-label">Latency</span>
-                                    <strong class="device-metric-value">${latency}</strong>
+                                    <strong class="device-metric-value" data-metric="latency">N/A</strong>
                                 </div>
                                 <div class="device-metric-card">
-                                    <span class="device-metric-label">Traffic Load</span>
-                                    <strong class="device-metric-value">${traffic}</strong>
+                                    <span class="device-metric-label">Packet Loss</span>
+                                    <strong class="device-metric-value" data-metric="packetLoss">${packetLoss}</strong>
                                 </div>
+                                <div class="device-metric-card">
+                                    <span class="device-metric-label">Min Latency</span>
+                                    <strong class="device-metric-value" data-metric="minLatency">N/A</strong>
+                                </div>
+                                <div class="device-metric-card">
+                                    <span class="device-metric-label">Max Latency</span>
+                                    <strong class="device-metric-value" data-metric="maxLatency">N/A</strong>
+                                </div>
+                            </div>
+                            <div class="small text-muted mt-2" data-device-ping-status>
+                                <i class="fas fa-spinner fa-spin me-1"></i> Pinging device...
                             </div>
                         </div>
                         ${description ? `
@@ -228,7 +260,369 @@ function openDeviceDetailsModal(device) {
     modalEl.addEventListener('hidden.bs.modal', function () {
         modalEl.remove();
     });
+
+    const editToggle = modalEl.querySelector('[data-device-action="toggle-location-edit"]');
+    const form = modalEl.querySelector('[data-device-form="location"]');
+    const cancelButton = modalEl.querySelector('[data-device-action="cancel-location-edit"]');
+    const errorEl = modalEl.querySelector('[data-device-location-error]');
+    const hintEl = modalEl.querySelector('[data-device-location-hint]');
+    const titleEl = modalEl.querySelector('[data-device-field="title"]');
+    const metaEl = modalEl.querySelector('[data-device-field="meta"]');
+    const nameEl = modalEl.querySelector('[data-device-field="name"]');
+    const typeEl = modalEl.querySelector('[data-device-field="type"]');
+    const locationEl = modalEl.querySelector('[data-device-field="location"]');
+    const buildingEl = modalEl.querySelector('[data-device-field="building"]');
+    const floorEl = modalEl.querySelector('[data-device-field="floor"]');
+    const roomEl = modalEl.querySelector('[data-device-field="room"]');
+    const nameInputEl = form ? form.querySelector('input[name="deviceName"]') : null;
+    const typeInputEl = form ? form.querySelector('input[name="deviceType"]') : null;
+    const buildingInputEl = form ? form.querySelector('input[name="building"]') : null;
+    const floorInputEl = form ? form.querySelector('input[name="floor"]') : null;
+    const roomInputEl = form ? form.querySelector('input[name="room"]') : null;
+    const submitButton = form ? form.querySelector('button[type="submit"]') : null;
+
+    const setFormVisible = (visible) => {
+        if (!form) return;
+        form.classList.toggle('d-none', !visible);
+        if (editToggle) {
+            editToggle.textContent = visible ? 'Close Editor' : 'Edit Details';
+        }
+    };
+
+    const resetFormValues = () => {
+        if (nameInputEl) nameInputEl.value = selected.name ? String(selected.name) : '';
+        if (typeInputEl) typeInputEl.value = selected.type ? String(selected.type) : '';
+        if (buildingInputEl) buildingInputEl.value = selected.building ? String(selected.building) : '';
+        if (floorInputEl) floorInputEl.value = selected.floor ? String(selected.floor) : '';
+        if (roomInputEl) roomInputEl.value = selected.room ? String(selected.room) : '';
+    };
+
+    const setBusy = (busy) => {
+        if (nameInputEl) nameInputEl.disabled = busy;
+        if (typeInputEl) typeInputEl.disabled = busy;
+        if (buildingInputEl) buildingInputEl.disabled = busy;
+        if (floorInputEl) floorInputEl.disabled = busy;
+        if (roomInputEl) roomInputEl.disabled = busy;
+        if (submitButton) submitButton.disabled = busy;
+        if (cancelButton) cancelButton.disabled = busy;
+        if (editToggle) editToggle.disabled = busy;
+    };
+
+    const setError = (message) => {
+        if (!errorEl) return;
+        if (!message) {
+            errorEl.classList.add('d-none');
+            errorEl.textContent = '';
+            return;
+        }
+        errorEl.textContent = message;
+        errorEl.classList.remove('d-none');
+    };
+
+    const applyDeviceUpdate = (payload) => {
+        if (!payload) return;
+        const nameValue = payload.name || selected.name || '';
+        const typeValue = payload.type || selected.type || '';
+        const buildingValue = payload.building || '';
+        const floorValue = payload.floor || '';
+        const roomValue = payload.room || '';
+        const locationLabel = formatLocationLabel(buildingValue, floorValue, roomValue);
+
+        selected.name = nameValue;
+        selected.type = typeValue;
+        selected.building = buildingValue;
+        selected.floor = floorValue;
+        selected.room = roomValue;
+        selected.location = locationLabel;
+
+        const deviceId = selected.id;
+        const deviceIp = selected.ip;
+        const deviceIdValue = deviceId ? String(deviceId) : '';
+        const cached = devicesData.find(item => {
+            if (deviceIp && item.ip === deviceIp) return true;
+            if (deviceIdValue && item.id !== undefined && item.id !== null) {
+                return String(item.id) === deviceIdValue;
+            }
+            return false;
+        });
+        if (cached && cached !== selected) {
+            cached.name = nameValue;
+            cached.type = typeValue;
+            cached.building = buildingValue;
+            cached.floor = floorValue;
+            cached.room = roomValue;
+            cached.location = locationLabel;
+        }
+
+        const topoDevice = campusDevices.find(item => {
+            if (deviceIp && item.ip === deviceIp) return true;
+            if (deviceIdValue && item.id !== undefined && item.id !== null) {
+                return String(item.id) === deviceIdValue;
+            }
+            return false;
+        });
+        if (topoDevice) {
+            topoDevice.name = nameValue;
+            topoDevice.type = typeValue;
+            topoDevice.building = buildingValue;
+            topoDevice.floor = floorValue;
+            topoDevice.room = roomValue;
+            topoDevice.location = locationLabel;
+        }
+
+        if (titleEl) titleEl.textContent = formatDeviceValue(nameValue || selected.ip || 'Device', 'Device');
+        if (metaEl) metaEl.textContent = `${formatDeviceValue(typeValue)} - ${ip}`;
+        if (nameEl) nameEl.textContent = formatDeviceValue(nameValue || 'Device', 'Device');
+        if (typeEl) typeEl.textContent = formatDeviceValue(typeValue);
+        if (locationEl) locationEl.textContent = formatDeviceValue(locationLabel);
+        if (buildingEl) buildingEl.textContent = formatDeviceValue(buildingValue);
+        if (floorEl) floorEl.textContent = formatDeviceValue(floorValue);
+        if (roomEl) roomEl.textContent = formatDeviceValue(roomValue);
+    };
+
+    if (hintEl) {
+        hintEl.textContent = canEditLocation
+            ? 'Updates are saved to the device and location records.'
+            : 'Device edits are unavailable for this device.';
+    }
+
+    if (form && editToggle) {
+        if (canEditLocation) {
+            editToggle.addEventListener('click', () => {
+                const isHidden = form.classList.contains('d-none');
+                if (isHidden) {
+                    resetFormValues();
+                    setError('');
+                }
+                setFormVisible(isHidden);
+            });
+        }
+
+        if (cancelButton) {
+            cancelButton.addEventListener('click', () => {
+                setError('');
+                resetFormValues();
+                setFormVisible(false);
+            });
+        }
+
+        if (canEditLocation) {
+            form.addEventListener('submit', async (event) => {
+                event.preventDefault();
+                setError('');
+
+                const buildingValue = buildingInputEl ? buildingInputEl.value.trim() : '';
+                const floorValue = floorInputEl ? floorInputEl.value.trim() : '';
+                const roomValue = roomInputEl ? roomInputEl.value.trim() : '';
+                const nameValue = nameInputEl ? nameInputEl.value.trim() : '';
+                const typeValue = typeInputEl ? typeInputEl.value.trim() : '';
+
+                if (!nameValue || !typeValue) {
+                    setError('Device name and type are required.');
+                    return;
+                }
+
+                if (nameValue.length > 120) {
+                    setError('Device name is too long.');
+                    return;
+                }
+
+                if (typeValue.length > 60) {
+                    setError('Device type is too long.');
+                    return;
+                }
+
+                if (!buildingValue || !floorValue) {
+                    setError('Building and floor are required.');
+                    return;
+                }
+
+                if (buildingValue.length > 120) {
+                    setError('Building name is too long.');
+                    return;
+                }
+
+                if (floorValue.length > 50) {
+                    setError('Floor value is too long.');
+                    return;
+                }
+
+                if (roomValue.length > 80) {
+                    setError('Room/area value is too long.');
+                    return;
+                }
+
+                if (!selected.id) {
+                    setError('This device does not have an ID yet.');
+                    return;
+                }
+
+                setBusy(true);
+                try {
+                    const baseUrl = getTopologyApiBase();
+                    const response = await fetch(`${baseUrl}/api/devices/${encodeURIComponent(selected.id)}/location`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
+                        body: JSON.stringify({
+                            name: nameValue,
+                            type: typeValue,
+                            building: buildingValue,
+                            floor: floorValue,
+                            room: roomValue
+                        })
+                    });
+
+                    if (!response.ok) {
+                        let message = '';
+                        const payload = await response.json().catch(() => null);
+                        if (payload && payload.error) {
+                            message = payload.error;
+                        } else {
+                            const text = await response.text().catch(() => '');
+                            message = text ? text.trim() : '';
+                        }
+                        const statusLabel = response.status ? `HTTP ${response.status}` : 'Request failed';
+                        throw new Error(message ? `${statusLabel}: ${message}` : `${statusLabel}: Unable to update device details right now.`);
+                    }
+
+                    const updated = await response.json();
+                    applyDeviceUpdate({
+                        name: updated.name || nameValue,
+                        type: updated.type || typeValue,
+                        building: updated.building || buildingValue,
+                        floor: updated.floor || floorValue,
+                        room: updated.room || roomValue
+                    });
+                    populateDevicesTable();
+                    setFormVisible(false);
+                } catch (error) {
+                    setError(error.message || 'Unable to update device details right now.');
+                } finally {
+                    setBusy(false);
+                }
+            });
+        }
+    }
+
+    // Live ICMP ping fetch helper
+    const latencyEl = modalEl.querySelector('[data-metric="latency"]');
+    const packetLossEl = modalEl.querySelector('[data-metric="packetLoss"]');
+    const minLatencyEl = modalEl.querySelector('[data-metric="minLatency"]');
+    const maxLatencyEl = modalEl.querySelector('[data-metric="maxLatency"]');
+    const pingStatusEl = modalEl.querySelector('[data-device-ping-status]');
+    const rePingBtn = modalEl.querySelector('[data-device-action="re-ping"]');
+
+    const formatPingMs = (value) => {
+        if (value === null || value === undefined) return 'N/A';
+        const num = Number(value);
+        return Number.isFinite(num) ? `${num.toFixed(1)} ms` : 'N/A';
+    };
+
+    const formatLoss = (value) => {
+        if (value === null || value === undefined) return 'N/A';
+        const num = Number(value);
+        return Number.isFinite(num) ? `${num.toFixed(1)}%` : 'N/A';
+    };
+
+    const getLossColor = (value) => {
+        if (value === null || value === undefined) return '';
+        const num = Number(value);
+        if (!Number.isFinite(num)) return '';
+        if (num === 0) return '#18a368';
+        if (num <= 5) return '#f09a35';
+        return '#de5b54';
+    };
+
+    const getLatencyColor = (value) => {
+        if (value === null || value === undefined) return '';
+        const num = Number(value);
+        if (!Number.isFinite(num)) return '';
+        if (num <= 50) return '#18a368';
+        if (num <= 150) return '#f09a35';
+        return '#de5b54';
+    };
+
+    const applyPingResults = (data) => {
+        if (latencyEl) {
+            latencyEl.textContent = formatPingMs(data.latencyMs !== undefined ? data.latencyMs : data.avgMs);
+            const latColor = getLatencyColor(data.latencyMs !== undefined ? data.latencyMs : data.avgMs);
+            if (latColor) latencyEl.style.color = latColor;
+        }
+        if (packetLossEl) {
+            packetLossEl.textContent = formatLoss(data.packetLoss);
+            const lossColor = getLossColor(data.packetLoss);
+            if (lossColor) packetLossEl.style.color = lossColor;
+        }
+        if (minLatencyEl) {
+            minLatencyEl.textContent = formatPingMs(data.minMs);
+        }
+        if (maxLatencyEl) {
+            maxLatencyEl.textContent = formatPingMs(data.maxMs);
+        }
+    };
+
+    const fetchLivePing = async () => {
+        if (pingStatusEl) {
+            pingStatusEl.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Pinging device...';
+            pingStatusEl.className = 'small text-muted mt-2';
+        }
+        if (rePingBtn) rePingBtn.disabled = true;
+
+        try {
+            const baseUrl = getTopologyApiBase();
+            let url;
+            if (selected.id && !isNaN(Number(selected.id)) && Number(selected.id) > 0) {
+                url = `${baseUrl}/api/devices/${encodeURIComponent(selected.id)}/ping`;
+            } else if (selected.ip) {
+                url = `${baseUrl}/api/ping?target=${encodeURIComponent(selected.ip)}`;
+            } else {
+                if (pingStatusEl) {
+                    pingStatusEl.innerHTML = '<i class="fas fa-exclamation-triangle me-1"></i> No IP address available for ping.';
+                    pingStatusEl.className = 'small text-warning mt-2';
+                }
+                return;
+            }
+
+            const response = await fetch(url, { credentials: 'include' });
+            if (!response.ok) {
+                const errPayload = await response.json().catch(() => ({}));
+                throw new Error(errPayload.error || 'Ping request failed.');
+            }
+
+            const data = await response.json();
+            applyPingResults(data);
+
+            if (data.alive) {
+                const probeInfo = data.probes ? ` (${data.probes} probes)` : '';
+                if (pingStatusEl) {
+                    pingStatusEl.innerHTML = `<i class="fas fa-check-circle me-1 text-success"></i> Device reachable${probeInfo}`;
+                    pingStatusEl.className = 'small text-success mt-2';
+                }
+            } else {
+                if (pingStatusEl) {
+                    pingStatusEl.innerHTML = '<i class="fas fa-times-circle me-1"></i> Device unreachable';
+                    pingStatusEl.className = 'small text-danger mt-2';
+                }
+            }
+        } catch (error) {
+            if (pingStatusEl) {
+                pingStatusEl.innerHTML = `<i class="fas fa-exclamation-circle me-1"></i> ${error.message || 'Ping failed'}`;
+                pingStatusEl.className = 'small text-danger mt-2';
+            }
+        } finally {
+            if (rePingBtn) rePingBtn.disabled = false;
+        }
+    };
+
+    if (rePingBtn) {
+        rePingBtn.addEventListener('click', fetchLivePing);
+    }
+
     modal.show();
+
+    // Trigger live ping after modal is visible
+    fetchLivePing();
 }
 
 function initDeviceTableActions() {
@@ -271,24 +665,88 @@ function populateRecentAlerts() {
         </li>`).join('');
 }
 
-function populateAlertsTable() {
+async function populateAlertsTable() {
     const tbody = document.querySelector('#alerts-table tbody');
     if (!tbody) return;
 
-    tbody.innerHTML = alertsData.map(a => `
-        <tr>
-            <td>${a.time}</td>
+    try {
+        const res = await fetch(getTopologyApiBase() + '/api/alerts', { credentials: 'include' });
+        if (res.ok) alertsData = await res.json();
+    } catch (e) { /* keep alertsData as-is */ }
+
+    tbody.innerHTML = alertsData.map(a => {
+        const label = a.severity === 'danger' ? 'High' : a.severity === 'warning' ? 'Warning' : 'Info';
+        const badgeClass = a.severity === 'danger' ? 'danger' : a.severity === 'warning' ? 'warning' : 'success';
+        const statusBadge = a.resolved
+            ? `<span class="badge bg-success">Resolved</span>${a.resolvedBy ? `<br><small class="text-muted">${a.resolvedBy}</small>` : ''}`
+            : '<span class="badge bg-secondary">Open</span>';
+        const actionBtn = a.resolved
+            ? ''
+            : `<button class="btn btn-sm btn-outline-success" onclick="resolveAlert(${a.id}, this)"><i class="fas fa-check me-1"></i>Resolve</button>`;
+        return `<tr data-alert-id="${a.id}">
+            <td>${new Date(a.time).toLocaleString()}</td>
             <td>${a.device}</td>
             <td>${a.issue}</td>
-            <td><span class="badge bg-${a.severity === 'High' ? 'danger' : 'warning'}">${a.severity}</span></td>
-        </tr>`).join('');
+            <td><span class="badge bg-${badgeClass}">${label}</span></td>
+            <td>${statusBadge}</td>
+            <td>${actionBtn}</td>
+        </tr>`;
+    }).join('');
+}
+
+async function resolveAlert(alertId, btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+    try {
+        const res = await fetch(getTopologyApiBase() + `/api/alerts/${alertId}/resolve`, {
+            method: 'PUT',
+            credentials: 'include'
+        });
+        if (!res.ok) throw new Error('Server error');
+        const data = await res.json();
+        const row = document.querySelector(`tr[data-alert-id="${alertId}"]`);
+        if (row) {
+            row.cells[4].innerHTML = `<span class="badge bg-success">Resolved</span>${data.resolvedBy ? `<br><small class="text-muted">${data.resolvedBy}</small>` : ''}`;
+            row.cells[5].innerHTML = '';
+            const entry = alertsData.find(item => item.id === alertId);
+            if (entry) { entry.resolved = true; entry.resolvedAt = data.resolvedAt; entry.resolvedBy = data.resolvedBy; }
+        }
+    } catch (e) {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-check me-1"></i>Resolve';
+        console.error('Failed to resolve alert:', e);
+    }
+}
+
+function exportAlertsCSV() {
+    if (!alertsData.length) return;
+    const headers = ['ID', 'Timestamp', 'Device', 'Issue', 'Severity', 'Status', 'Resolved At', 'Resolved By'];
+    const csvRows = alertsData.map(a => [
+        a.id,
+        new Date(a.time).toLocaleString(),
+        a.device,
+        a.issue,
+        a.severity === 'danger' ? 'High' : a.severity === 'warning' ? 'Warning' : 'Info',
+        a.resolved ? 'Resolved' : 'Open',
+        a.resolvedAt ? new Date(a.resolvedAt).toLocaleString() : '',
+        a.resolvedBy || ''
+    ]);
+    const csv = [headers, ...csvRows].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `alerts_${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
 }
 
 function populateReportsTable() {
     const tbody = document.querySelector('#reports-devices-table tbody');
     if (!tbody) return;
 
-    tbody.innerHTML = campusDevices.map(device => {
+    const source = campusDevices.length > 0 ? campusDevices : devicesData;
+    tbody.innerHTML = source.map(device => {
         let statusClass = 'warning';
         if (device.status === 'Online') statusClass = 'success';
         if (device.status === 'Offline') statusClass = 'danger';
@@ -328,7 +786,7 @@ function getTopologyApiBase() {
 const TOPOLOGY_POLL_INTERVAL_MS = Number(window.TOPOLOGY_POLL_INTERVAL_MS || 15000);
 
 function normalizeTopologyDevice(device) {
-    const idSource = device && (device.id || device.DeviceID || device.ip || device.name);
+    const idSource = device && (device.ip || device.id || device.DeviceID || device.name);
     return {
         id: idSource ? String(idSource) : 'device-unknown',
         name: (device && (device.name || device.DeviceName || device.ip)) || 'Device',
@@ -552,6 +1010,29 @@ function updateTopologyData(options = {}) {
 
 function applyTopologyLayout(viewMode) {
     if (!topologyNetwork) return;
+
+    if (viewMode === 'hierarchy') {
+        topologyNetwork.setOptions({
+            layout: {
+                hierarchical: {
+                    enabled: true,
+                    direction: 'UD',
+                    sortMethod: 'hubsize',
+                    levelSeparation: 150,
+                    nodeSpacing: 120,
+                    treeSpacing: 200
+                }
+            },
+            physics: { enabled: false },
+            interaction: {
+                dragNodes: true,
+                dragView: true,
+                zoomView: true
+            }
+        });
+        topologyNetwork.fit({ animation: { duration: 400, easingFunction: 'easeInOutQuad' } });
+        return;
+    }
 
     if (viewMode === 'floor') {
         topologyNetwork.setOptions({
@@ -784,8 +1265,8 @@ function renderSelectedDevice(deviceId) {
         </ul>
         <h6 class="section-title mb-2">Connected Links (${connectedDevices.length})</h6>
         ${connectedDevices.length === 0
-                    ? '<p class="text-muted mb-0">No active links in current filter scope.</p>'
-                    : connectedDevices.map(conn => `
+            ? '<p class="text-muted mb-0">No active links in current filter scope.</p>'
+            : connectedDevices.map(conn => `
                         <div class="device-connection-item">
                             <strong>${conn.name}</strong><br>
                             <small>${conn.metaLine}</small>
@@ -892,7 +1373,7 @@ function initTopology() {
 }
 
 let dashboardChartInstance = null;
-let dashboardRefreshTimer = null;
+
 
 function createStatusChart(onlineCount, offlineCount, unknownCount) {
     const canvas = document.getElementById('statusChart');
@@ -957,7 +1438,7 @@ function createStatusChart(onlineCount, offlineCount, unknownCount) {
                     cornerRadius: 10,
                     padding: 12,
                     callbacks: {
-                        label: function(context) {
+                        label: function (context) {
                             const value = context.parsed;
                             const pct = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
                             return ` ${context.label}: ${value} (${pct}%)`;
@@ -1161,7 +1642,192 @@ async function initScanSettings() {
     });
 }
 
-window.onload = async function () {
+function initDashboardRealtime() {
+    const pingStreamFeed = document.getElementById('ping-stream-feed');
+
+    if (typeof io === 'function') {
+        const dashboardSocket = io(getTopologyApiBase(), {
+            withCredentials: true,
+            transports: ['websocket', 'polling']
+        });
+
+        dashboardSocket.on('devices:ping_stream', (results) => {
+            if (pingStreamFeed) {
+                let html = '';
+                results.forEach(res => {
+                    const displayStatus = res.status || (res.alive ? 'Online' : 'Offline');
+                    const statusColor = displayStatus === 'Online' ? 'success' : 'danger';
+                    const latencyText = res.latencyMs !== null ? `${res.latencyMs.toFixed(1)} ms` : 'N/A';
+                    html += `
+                        <div class="list-group-item d-flex justify-content-between align-items-center py-2">
+                            <div>
+                                <small class="fw-bold">${res.name || res.ip}</small><br>
+                                <small class="text-muted" style="font-size:0.75rem;">${new Date(res.time).toLocaleTimeString()}</small>
+                            </div>
+                            <div class="text-end">
+                                <span class="badge bg-${statusColor} mb-1">${displayStatus}</span><br>
+                                <small class="text-muted" style="font-size:0.75rem;">${latencyText}</small>
+                            </div>
+                        </div>
+                    `;
+                });
+                pingStreamFeed.innerHTML = html;
+            }
+
+            // Real-time table updates
+            if (typeof devicesData !== 'undefined' && Array.isArray(devicesData)) {
+                let onlineCount = 0;
+                let offlineCount = 0;
+                let unknownCount = 0;
+                let topologyNeedsUpdate = false;
+
+                results.forEach(res => {
+                    const newStatus = res.status || (res.alive ? 'Online' : 'Offline');
+                    const dev = devicesData.find(d => d.id === res.deviceId || d.ip === res.ip);
+                    if (dev) {
+                        dev.status = newStatus;
+                        dev.lastSeen = formatLastSeen(res.time);
+
+                        const deviceKey = getDeviceKey(dev);
+                        const row = document.querySelector(`tr[data-device-row="${deviceKey}"]`);
+                        if (row) {
+                            const statusCell = row.querySelector('[data-status-cell]');
+                            if (statusCell) {
+                                statusCell.innerHTML = buildStatusMarkup(newStatus);
+                            }
+                            const lastSeenCell = row.querySelector('[data-last-seen-cell]');
+                            if (lastSeenCell) {
+                                lastSeenCell.innerText = formatDeviceValue(dev.lastSeen);
+                            }
+                        }
+                    }
+
+                    if (typeof campusDevices !== 'undefined') {
+                        const topoDev = campusDevices.find(d => d.id === res.deviceId || d.ip === res.ip);
+                        if (topoDev && topoDev.status !== newStatus) {
+                            topoDev.status = newStatus;
+                            topologyNeedsUpdate = true;
+                        }
+                    }
+                });
+
+                if (topologyNeedsUpdate && typeof updateTopologyData === 'function') {
+                    updateTopologyData({ fit: false });
+                }
+
+                devicesData.forEach(d => {
+                    if (d.status === 'Online') onlineCount++;
+                    else if (d.status === 'Offline') offlineCount++;
+                    else unknownCount++;
+                });
+
+                const totalEl = document.getElementById('total-devices');
+                const onlineEl = document.getElementById('online-count');
+                const offlineEl = document.getElementById('offline-count');
+                const alertsEl = document.getElementById('alerts-today');
+
+                if (totalEl) totalEl.innerText = devicesData.length;
+                if (onlineEl) onlineEl.innerText = onlineCount;
+                if (offlineEl) offlineEl.innerText = offlineCount;
+                if (alertsEl) alertsEl.innerText = offlineCount;
+
+                if (typeof window.createStatusChart === 'function') {
+                    window.createStatusChart(onlineCount, offlineCount, unknownCount);
+                }
+            }
+        });
+
+        dashboardSocket.on('devices:update', (devices) => {
+            if (Array.isArray(devices)) {
+                setDevicesData(devices.map(d => ({
+                    ...d,
+                    lastSeen: typeof formatLastSeen === 'function' ? formatLastSeen(d.lastSeen) : d.lastSeen
+                })));
+            }
+        });
+
+        dashboardSocket.on('alert:new', (alert) => {
+            // Show toast notification
+            let toastContainer = document.getElementById('alertToastContainer');
+            if (!toastContainer) {
+                toastContainer = document.createElement('div');
+                toastContainer.id = 'alertToastContainer';
+                toastContainer.className = 'toast-container position-fixed bottom-0 end-0 p-3';
+                toastContainer.style.zIndex = '1055';
+                document.body.appendChild(toastContainer);
+            }
+
+            const toastId = 'toast-' + Date.now();
+            const icon = alert.severity === 'danger' ? 'fa-exclamation-triangle' : (alert.severity === 'warning' ? 'fa-exclamation-circle' : 'fa-check-circle');
+            const toastHtml = `
+                <div id="${toastId}" class="toast align-items-center text-bg-${alert.severity} border-0" role="alert" aria-live="assertive" aria-atomic="true">
+                    <div class="d-flex">
+                        <div class="toast-body fw-semibold">
+                            <i class="fas ${icon} me-2"></i> ${alert.message}
+                        </div>
+                        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+                    </div>
+                </div>
+            `;
+            toastContainer.insertAdjacentHTML('beforeend', toastHtml);
+            
+            // Enforce maximum of 4 alerts by removing the oldest one
+            const existingToasts = toastContainer.querySelectorAll('.toast');
+            if (existingToasts.length > 4) {
+                existingToasts[0].remove();
+            }
+            
+            const toastEl = document.getElementById(toastId);
+
+            if (typeof bootstrap !== 'undefined') {
+                const bsToast = new bootstrap.Toast(toastEl, {
+                    autohide: true,
+                    delay: 3000
+                });
+
+                bsToast.show();
+                toastEl.addEventListener('hidden.bs.toast', () => toastEl.remove());
+            }
+
+            // Add to "Recent Alerts" feed on dashboard
+            const recentAlerts = document.getElementById('recent-alerts');
+            if (recentAlerts) {
+                const timeStr = new Date(alert.time).toLocaleTimeString();
+                const alertHtml = `
+                    <li class="list-group-item px-0 py-3">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div class="ms-2 me-auto">
+                                <div class="fw-bold mb-1">${alert.message}</div>
+                                <span class="badge bg-${alert.severity} me-1">${alert.type.toUpperCase()}</span>
+                                <small class="text-muted"><i class="far fa-clock me-1"></i>${timeStr}</small>
+                            </div>
+                        </div>
+                    </li>
+                `;
+                recentAlerts.insertAdjacentHTML('afterbegin', alertHtml);
+                // Keep only the 10 most recent
+                while (recentAlerts.children.length > 10) {
+                    recentAlerts.lastElementChild.remove();
+                }
+            }
+
+            // Prepend live row to the Alerts page table if it's open
+            const alertTbody = document.querySelector('#alerts-table tbody');
+            if (alertTbody) {
+                const label = alert.severity === 'danger' ? 'High' : alert.severity === 'warning' ? 'Warning' : 'Info';
+                const badgeClass = alert.severity === 'danger' ? 'danger' : alert.severity === 'warning' ? 'warning' : 'success';
+                alertTbody.insertAdjacentHTML('afterbegin', `<tr>
+                    <td>${new Date(alert.time).toLocaleString()}</td>
+                    <td>${alert.deviceName || 'Unknown'}</td>
+                    <td>${alert.message}</td>
+                    <td><span class="badge bg-${badgeClass}">${label}</span></td>
+                </tr>`);
+            }
+        });
+    }
+}
+
+window.addEventListener('load', async function () {
     await loadSidebar();
     await initScanSettings();
     populateDevicesTable();
@@ -1170,9 +1836,27 @@ window.onload = async function () {
     populateAlertsTable();
     populateReportsTable();
     initTopology();
+    initDashboardRealtime();
+
+    // Wire up the email alert toggle in Settings
+    const emailSwitch = document.getElementById('emailAlertSwitch');
+    if (emailSwitch) {
+        fetch(getSettingsApiBase() + '/api/settings/email-alerts', { credentials: 'include' })
+            .then(r => r.json())
+            .then(d => { emailSwitch.checked = d.emailAlertsEnabled; })
+            .catch(() => {});
+        emailSwitch.addEventListener('change', () => {
+            fetch(getSettingsApiBase() + '/api/settings/email-alerts', {
+                method: 'POST',
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ enabled: emailSwitch.checked })
+            }).catch(() => {});
+        });
+    }
 
     console.log('%cCampusNet UI layout loaded successfully!', 'color:#0d6efd; font-weight:bold');
-};
+});
 
 window.addEventListener('resize', () => {
     if (window.innerWidth >= 992) {
