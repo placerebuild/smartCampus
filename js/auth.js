@@ -122,7 +122,16 @@ async function initializeAuthState() {
     const user = await loadSessionUser();
 
     if (user) {
+        window._sessionUser = user;
+
         if (isAuthPage && !window.isAuthenticating) {
+            window.location.href = 'index.html';
+            return;
+        }
+
+        // Enforce page-level role requirement set via window.pageRequiredRole
+        const required = window.pageRequiredRole;
+        if (required && user.role !== required) {
             window.location.href = 'index.html';
             return;
         }
@@ -232,6 +241,19 @@ if (loginForm) {
         }
     });
 }
+
+// ================== PAGE ROLE GUARD ==================
+// Call at the top of admin-only pages: requirePageRole('Admin')
+window.requirePageRole = async function (...roles) {
+    const user = await loadSessionUser();
+    if (!user) {
+        window.location.href = 'login.html';
+        return;
+    }
+    if (!roles.includes(user.role)) {
+        window.location.href = 'index.html';
+    }
+};
 
 // ================== LOGOUT FUNCTION ==================
 window.appLogout = async function () {

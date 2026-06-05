@@ -90,6 +90,9 @@ function applyDeviceResults(devices) {
     setTopologyDevices(devices);
     updateTopologyData({ fit: false });
     populateReportsTable();
+    if (typeof topologyViewMode !== 'undefined' && topologyViewMode === 'floor') {
+        renderFloorMap(currentFloor);
+    }
 }
 
 
@@ -249,6 +252,12 @@ function openDeviceDetailsModal(device) {
                         </div>
                         ` : ''}
                     </div>
+                    ${(selected.id && window._sessionUser && window._sessionUser.role === 'Admin') ? `
+                    <div class="modal-footer border-0 pt-0">
+                        <button type="button" class="btn btn-sm btn-outline-danger ms-auto" data-device-action="delete">
+                            <i class="fas fa-trash-alt me-1"></i> Delete Device
+                        </button>
+                    </div>` : ''}
                 </div>
             </div>
         </div>`;
@@ -260,6 +269,32 @@ function openDeviceDetailsModal(device) {
     modalEl.addEventListener('hidden.bs.modal', function () {
         modalEl.remove();
     });
+
+    const deleteBtn = modalEl.querySelector('[data-device-action="delete"]');
+    if (deleteBtn && selected.id) {
+        deleteBtn.addEventListener('click', async () => {
+            if (!confirm(`Delete "${selected.name || selected.ip}"? This cannot be undone.`)) return;
+            deleteBtn.disabled = true;
+            deleteBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Deleting...';
+            try {
+                const res = await fetch(`${getTopologyApiBase()}/api/devices/${encodeURIComponent(selected.id)}`, {
+                    method: 'DELETE',
+                    credentials: 'include'
+                });
+                if (!res.ok) {
+                    const payload = await res.json().catch(() => ({}));
+                    throw new Error(payload.error || 'Delete failed.');
+                }
+                modal.hide();
+                devicesData = devicesData.filter(d => d.id !== selected.id);
+                populateDevicesTable();
+            } catch (err) {
+                deleteBtn.disabled = false;
+                deleteBtn.innerHTML = '<i class="fas fa-trash-alt me-1"></i> Delete Device';
+                alert(err.message || 'Unable to delete device.');
+            }
+        });
+    }
 
     const editToggle = modalEl.querySelector('[data-device-action="toggle-location-edit"]');
     const form = modalEl.querySelector('[data-device-form="location"]');
@@ -1008,6 +1043,161 @@ function updateTopologyData(options = {}) {
     }
 }
 
+// ---- Floor Map ----
+
+let currentFloor = 1;
+
+function getFloorPositions() {
+    try { return JSON.parse(localStorage.getItem('floorMapPositions') || '{}'); } catch (_) { return {}; }
+}
+
+function saveFloorPosition(key, x, y) {
+    const pos = getFloorPositions();
+    pos[key] = { x, y };
+    localStorage.setItem('floorMapPositions', JSON.stringify(pos));
+}
+
+function deviceStatusClass(status) {
+    if (!status) return 'status-unknown';
+    const s = String(status).toLowerCase();
+    if (s === 'online') return 'status-online';
+    if (s === 'offline') return 'status-offline';
+    if (s === 'warning') return 'status-warning';
+    return 'status-unknown';
+}
+
+function defaultFloorPosition(key, index, total) {
+    const hash = [...key].reduce((acc, c) => acc + c.charCodeAt(0), 0);
+    const cols = Math.max(Math.ceil(Math.sqrt(total + 1)), 2);
+    const rows = Math.ceil(total / cols);
+    const col = index % cols;
+    const row = Math.floor(index / cols);
+    const jx = ((hash * 7) % 9) - 4;
+    const jy = ((hash * 13) % 9) - 4;
+    const x = 10 + (col / Math.max(cols - 1, 1)) * 78 + jx;
+    const y = 12 + (row / Math.max(rows - 1, 1)) * 72 + jy;
+    return { x: Math.min(Math.max(x, 5), 93), y: Math.min(Math.max(y, 5), 93) };
+}
+
+function getDeviceFloorNumber(device) {
+    const f = String(device.floor || '').toLowerCase();
+    if (/\b(1|first|ground|uno)\b/.test(f)) return 1;
+    if (/\b(2|second|dos)\b/.test(f)) return 2;
+    return null;
+}
+
+function makeMarkerDraggable(marker, container, key) {
+    let dragging = false;
+    let startX, startY, startLeft, startTop;
+
+    marker.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        dragging = true;
+        startX = e.clientX;
+        startY = e.clientY;
+        startLeft = parseFloat(marker.style.left);
+        startTop = parseFloat(marker.style.top);
+        marker.style.zIndex = 20;
+    });
+
+    document.addEventListener('mousemove', (e) => {
+        if (!dragging) return;
+        const rect = container.getBoundingClientRect();
+        const dx = ((e.clientX - startX) / rect.width) * 100;
+        const dy = ((e.clientY - startY) / rect.height) * 100;
+        const newX = Math.min(Math.max(startLeft + dx, 2), 97);
+        const newY = Math.min(Math.max(startTop + dy, 2), 97);
+        marker.style.left = newX + '%';
+        marker.style.top = newY + '%';
+    });
+
+    document.addEventListener('mouseup', () => {
+        if (!dragging) return;
+        dragging = false;
+        marker.style.zIndex = 5;
+        saveFloorPosition(key, parseFloat(marker.style.left), parseFloat(marker.style.top));
+    });
+}
+
+function renderFloorMap(floorNum) {
+    const container = document.getElementById('floor-map-container');
+    const img = document.getElementById('floor-map-img');
+    if (!container || !img) return;
+
+    img.src = floorNum === 2 ? '../images/2ndFloor.jpg' : '../images/1stFloor.jpg';
+
+    container.querySelectorAll('.floor-device-marker').forEach(el => el.remove());
+
+    const positions = getFloorPositions();
+    const devices = (typeof devicesData !== 'undefined' && devicesData.length) ? devicesData :
+                    (typeof topologyDevices !== 'undefined' ? topologyDevices : []);
+
+    let visibleIndex = 0;
+    const visibleDevices = devices.filter(d => {
+        const df = getDeviceFloorNumber(d);
+        return df === null || df === floorNum;
+    });
+
+    visibleDevices.forEach((device, idx) => {
+        const key = typeof getDeviceKey === 'function' ? getDeviceKey(device) : (device.ip || String(idx));
+        const pos = positions[key] || defaultFloorPosition(key, idx, visibleDevices.length);
+
+        const marker = document.createElement('div');
+        marker.className = 'floor-device-marker';
+        marker.style.left = pos.x + '%';
+        marker.style.top = pos.y + '%';
+        marker.dataset.deviceKey = key;
+
+        const dot = document.createElement('span');
+        dot.className = `floor-marker-dot ${deviceStatusClass(device.status)}`;
+
+        const label = document.createElement('span');
+        label.className = 'floor-marker-label';
+        label.textContent = `${device.name || device.ip || 'Device'} · ${device.ip || ''} · ${device.status || 'Unknown'}`;
+
+        marker.appendChild(dot);
+        marker.appendChild(label);
+        container.appendChild(marker);
+        makeMarkerDraggable(marker, container, key);
+        visibleIndex++;
+    });
+}
+
+function showFloorMap() {
+    const container = document.getElementById('floor-map-container');
+    const network = document.getElementById('network');
+    const floorGroup = document.getElementById('floor-selector-group');
+    const resetCol = document.getElementById('reset-btn-col');
+
+    if (container) container.style.display = 'block';
+    if (network) network.style.display = 'none';
+    if (floorGroup) floorGroup.style.display = '';
+    if (resetCol) resetCol.style.display = 'none';
+
+    renderFloorMap(currentFloor);
+}
+
+function hideFloorMap() {
+    const container = document.getElementById('floor-map-container');
+    const network = document.getElementById('network');
+    const floorGroup = document.getElementById('floor-selector-group');
+    const resetCol = document.getElementById('reset-btn-col');
+
+    if (container) container.style.display = 'none';
+    if (network) network.style.display = '';
+    if (floorGroup) floorGroup.style.display = 'none';
+    if (resetCol) resetCol.style.display = '';
+}
+
+window.switchFloor = function (floorNum) {
+    currentFloor = floorNum;
+    document.getElementById('floor-btn-1').classList.toggle('active', floorNum === 1);
+    document.getElementById('floor-btn-2').classList.toggle('active', floorNum === 2);
+    renderFloorMap(floorNum);
+};
+
+// ---- End Floor Map ----
+
 function applyTopologyLayout(viewMode) {
     if (!topologyNetwork) return;
 
@@ -1035,17 +1225,11 @@ function applyTopologyLayout(viewMode) {
     }
 
     if (viewMode === 'floor') {
-        topologyNetwork.setOptions({
-            layout: { hierarchical: { enabled: false } },
-            physics: { enabled: false },
-            interaction: {
-                dragNodes: true,
-                dragView: true,
-                zoomView: true
-            }
-        });
+        showFloorMap();
         return;
     }
+
+    hideFloorMap();
 
     topologyNetwork.setOptions({
         layout: { hierarchical: { enabled: false } },
@@ -1346,10 +1530,11 @@ function initTopology() {
         topologyViewMode = viewModeSelect.value || 'logical';
         viewModeSelect.addEventListener('change', function () {
             topologyViewMode = viewModeSelect.value || 'logical';
+            if (topologyViewMode !== 'floor') hideFloorMap();
             applyTopologyLayout(topologyViewMode);
             if (topologyViewMode === 'realtime') {
                 startTopologyRealtime();
-            } else {
+            } else if (topologyViewMode !== 'floor') {
                 stopTopologyRealtime();
                 loadTopologySnapshot({ fit: false });
             }
@@ -1550,6 +1735,17 @@ async function loadSidebar() {
                     link.classList.add('active');
                 }
             });
+
+            // Show admin-only nav items if the current user is an Admin
+            try {
+                const userRes = await fetch(`${getTopologyApiBase()}/api/auth/me`, { credentials: 'include' });
+                if (userRes.ok) {
+                    const user = await userRes.json();
+                    if (user.role === 'Admin') {
+                        container.querySelectorAll('[data-admin-only]').forEach(el => { el.style.display = ''; });
+                    }
+                }
+            } catch (_) {}
         }
     } catch (e) {
         console.warn('Sidebar not loaded. Are you running a local server?', e);

@@ -169,6 +169,28 @@ function requireAuth(req, res, next) {
   return next();
 }
 
+// Enforce role-based access — call after requireAuth
+function requireRole(...roles) {
+  return (req, res, next) => {
+    if (!req.session || !req.session.user) {
+      return res.status(401).json({ error: 'Not authenticated.' });
+    }
+    if (!roles.includes(req.session.user.role)) {
+      return res.status(403).json({ error: 'Insufficient permissions.' });
+    }
+    return next();
+  };
+}
+
+// Fire-and-forget activity log insert
+function logActivity(req, action, details = null) {
+  const user = req.session && req.session.user;
+  dbPool.execute(
+    'INSERT INTO activity_logs (UserID, FullName, Action, Details, IPAddress) VALUES (?,?,?,?,?)',
+    [user ? user.userId : null, user ? user.fullName : 'System', action, details, req.ip]
+  ).catch(err => console.error('Activity log error:', err.message));
+}
+
 // Network helpers and SNMP OID mapping
 const IP_V4_REGEX = /^(25[0-5]|2[0-4]\d|1?\d?\d)(\.(25[0-5]|2[0-4]\d|1?\d?\d)){3}$/;
 const SNMP_OIDS = {
@@ -1250,6 +1272,13 @@ async function discoverNetworkDevices(cidrOverride) {
     routerDeviceId = routerRow ? routerRow.DeviceID : null;
   }
 
+  // Discovery state update — 3-phase process:
+  //   Phase 1: Upsert every device found in this scan and record its DeviceID.
+  //   Phase 2: Mark router→endpoint connections as inactive if the endpoint
+  //            was NOT seen in this scan (it may have left the network).
+  //   Phase 3: Mark those same endpoint devices as Offline in the DEVICE table.
+  // Separating connection state from device state ensures the topology map
+  // reflects both the link loss and the device status independently.
   const seenEndpointIds = [];
   for (const entry of entries) {
     const deviceId = await upsertDiscoveredDevice(entry);
@@ -1412,6 +1441,13 @@ async function runContinuousPingSweep() {
     const [rows] = await dbPool.execute('SELECT DeviceID, IPAddress, DeviceName, Status FROM DEVICE');
     if (!rows || rows.length === 0) return;
 
+    // Debounce algorithm — prevents false alerts from temporary packet loss:
+    //   - A device is only declared Offline after OFFLINE_THRESHOLD (3) consecutive
+    //     failed pings. This tolerates brief network hiccups without triggering alerts.
+    //   - A device is only declared Online (recovered) after RECOVERY_THRESHOLD (2)
+    //     consecutive successful pings. This prevents flickering alerts on unstable links.
+    //   - Per-device state (failCount, successCount, confirmedStatus) is stored in
+    //     the realtimeDeviceStates Map and persists between sweep cycles.
     const results = await runWithConcurrency(rows, 20, async (device) => {
       const target = device.IPAddress;
       if (!isValidIp(target)) return null;
@@ -1472,7 +1508,7 @@ async function runContinuousPingSweep() {
           }
         }
       } else {
-        // Reset success streak and latrncy
+        // Reset success streak and latency
         successCount = 0;
         failCount += 1;
 
@@ -1480,7 +1516,7 @@ async function runContinuousPingSweep() {
         if (confirmedStatus !== 'Offline' && failCount >= OFFLINE_THRESHOLD) {
           confirmedStatus = 'Offline';
 
-          // Impact Assessment for Downtime Alert (unused for now)
+          // Check if this device has active downstream connections — escalate to CRITICAL if so
           let impactMessage = `Device ${device.DeviceName || target} went offline.`;
           try {
             const [connRows] = await dbPool.execute('SELECT COUNT(*) as downstreamCount FROM DEVICE_CONNECTION WHERE SourceDeviceID = ? AND IsActive = 1', [device.DeviceID]);
@@ -1535,7 +1571,7 @@ async function runContinuousPingSweep() {
 }
 
 // Scheduled device ping sweep — logs latency to DB for all connected devices
-// Runs at the same interval as the router scan so every device get DB entries
+// Runs at the same interval as the router scan so every device gets a DB entry
 async function runScheduledDevicePingSweep() {
   if (!scanningEnabled) return;
   if (scheduledDevicePingInFlight) return;
@@ -1704,6 +1740,7 @@ app.post('/api/auth/register', async (req, res) => {
     };
 
     req.session.user = sessionUser;
+    logActivity(req, 'user_registered', `Email: ${safeEmail}`);
     return res.json(sessionUser);
   } catch (error) {
     console.error('Register error:', error);
@@ -1749,6 +1786,7 @@ app.post('/api/auth/login', async (req, res) => {
     };
 
     req.session.user = sessionUser;
+    logActivity(req, 'login', `Email: ${safeEmail}`);
     return res.json(sessionUser);
   } catch (error) {
     console.error('Login error:', error);
@@ -1762,6 +1800,7 @@ app.post('/api/auth/logout', (req, res) => {
     return res.json({ ok: true });
   }
 
+  logActivity(req, 'logout', null);
   req.session.destroy((err) => {
     if (err) {
       console.error('Logout error:', err);
@@ -1852,6 +1891,7 @@ app.put('/api/alerts/:id/resolve', requireAuth, async (req, res) => {
       [alertId]
     );
     const r = rows[0];
+    logActivity(req, 'alert_resolved', `AlertID: ${alertId}`);
     return res.json({ ok: true, resolved: true, resolvedAt: r.ResolvedAt, resolvedBy: r.ResolvedBy });
   } catch (error) {
     console.error('Alert resolve error:', error);
@@ -1859,36 +1899,41 @@ app.put('/api/alerts/:id/resolve', requireAuth, async (req, res) => {
   }
 });
 
-// Email alert toggle — read current state
-app.get('/api/settings/email-alerts', requireAuth, (req, res) => {
+// Email alert toggle — read current state (Admin only)
+app.get('/api/settings/email-alerts', requireAuth, requireRole('Admin'), (req, res) => {
   res.json({ emailAlertsEnabled, smtpConfigured: Boolean(mailer) });
 });
 
-// Email alert toggle — update state at runtime without restart
-app.post('/api/settings/email-alerts', requireAuth, (req, res) => {
+// Email alert toggle — update state at runtime without restart (Admin only)
+app.post('/api/settings/email-alerts', requireAuth, requireRole('Admin'), (req, res) => {
   if (typeof req.body.enabled !== 'boolean') {
     return res.status(400).json({ error: 'enabled must be a boolean.' });
   }
   emailAlertsEnabled = req.body.enabled;
+  logActivity(req, 'settings_changed', `emailAlerts: ${req.body.enabled}`);
   return res.json({ ok: true, emailAlertsEnabled });
 });
 
 // Update a device details (name, type, building, floor, room)
 
-// Delete a single device by ID
-app.delete('/api/devices/:deviceId', requireAuth, async (req, res) => {
+// Delete a single device by ID (Admin only)
+app.delete('/api/devices/:deviceId', requireAuth, requireRole('Admin'), async (req, res) => {
   const deviceId = Number(req.params.deviceId);
   if (!Number.isInteger(deviceId) || deviceId <= 0) {
     return res.status(400).json({ error: 'Invalid device ID.' });
   }
 
   try {
+    const [deviceRows] = await dbPool.execute('SELECT DeviceName, IPAddress FROM DEVICE WHERE DeviceID = ? LIMIT 1', [deviceId]);
+    const deviceLabel = deviceRows[0] ? `${deviceRows[0].DeviceName} (${deviceRows[0].IPAddress})` : `ID:${deviceId}`;
+
     // ON DELETE CASCADE on fk_log_device, fk_connection_source/target, fk_alert_device
     // handles child-row cleanup automatically when DEVICE is deleted.
     const [result] = await dbPool.execute('DELETE FROM DEVICE WHERE DeviceID = ?', [deviceId]);
     if (result.affectedRows === 0) {
       return res.status(404).json({ error: 'Device not found.' });
     }
+    logActivity(req, 'device_deleted', deviceLabel);
     return res.json({ ok: true, message: 'Device deleted.' });
   } catch (error) {
     console.error('Device delete error:', error);
@@ -1896,7 +1941,7 @@ app.delete('/api/devices/:deviceId', requireAuth, async (req, res) => {
   }
 });
 
-// Bulk-remove all devices whose IPs match the blacklist (multicast ip ni (from windows network))
+// Bulk-remove all devices whose IPs match the blacklist (multicast IPs from Windows ARP table)
 app.post('/api/devices/cleanup-blacklisted', requireAuth, async (req, res) => {
   try {
     const [allDevices] = await dbPool.execute('SELECT DeviceID, IPAddress FROM DEVICE');
@@ -1974,6 +2019,7 @@ app.put('/api/devices/:deviceId/location', requireAuth, async (req, res) => {
       [nameRaw, typeRaw, locationId, deviceId]
     );
 
+    logActivity(req, 'device_updated', `DeviceID: ${deviceId}, Name: ${nameRaw}`);
     return res.json({
       locationId,
       location: formatLocationLabel({
@@ -1993,7 +2039,7 @@ app.put('/api/devices/:deviceId/location', requireAuth, async (req, res) => {
   }
 });
 
-// Live ICMP ping for a specific device (latency adn packet loss)
+// Live ICMP ping for a specific device (latency and packet loss)
 app.get('/api/devices/:deviceId/ping', requireAuth, async (req, res) => {
   const deviceId = Number(req.params.deviceId);
   if (!Number.isInteger(deviceId) || deviceId <= 0) {
@@ -2071,24 +2117,25 @@ app.get('/api/topology', requireAuth, async (req, res) => {
   }
 });
 
-// Get current scanning status
-app.get('/api/settings/scanning', requireAuth, (req, res) => {
+// Get current scanning status (Admin only)
+app.get('/api/settings/scanning', requireAuth, requireRole('Admin'), (req, res) => {
   return res.json({ enabled: scanningEnabled });
 });
 
-// Update scanning status
-app.put('/api/settings/scanning', requireAuth, (req, res) => {
+// Update scanning status (Admin only)
+app.put('/api/settings/scanning', requireAuth, requireRole('Admin'), (req, res) => {
   const parsed = parseRequiredBoolean(req.body?.enabled);
   if (parsed === null) {
     return res.status(400).json({ error: 'Enabled must be a boolean.' });
   }
 
   const enabled = setScanningEnabled(parsed);
+  logActivity(req, 'settings_changed', `scanning: ${enabled}`);
   return res.json({ enabled });
 });
 
-// Trigger an on-demand discovery scan
-app.post('/api/monitor/discover', requireAuth, async (req, res) => {
+// Trigger an on-demand discovery scan (Admin only)
+app.post('/api/monitor/discover', requireAuth, requireRole('Admin'), async (req, res) => {
   if (!scanningEnabled) {
     return res.status(409).json({ error: 'Scanning is disabled in settings.' });
   }
@@ -2100,6 +2147,7 @@ app.post('/api/monitor/discover', requireAuth, async (req, res) => {
       return res.status(400).json({ error: result.error || 'Discovery failed.' });
     }
 
+    logActivity(req, 'discovery_scan', `Found: ${result.discovered ? result.discovered.length : 0} devices`);
     emitTopologyUpdate('network-discovery', result.discovered);
     return res.json(result);
   } catch (error) {
@@ -2176,6 +2224,15 @@ app.get('/api/analytics/overview', requireAuth, async (req, res) => {
   if (!period) return res.status(400).json({ error: 'Invalid period. Use 24h, 7d, or 30d.' });
 
   try {
+    // Four separate queries are used because they aggregate different tables and scopes:
+    //   Query 1 (logStats):    Reads DEVICE_LOG to compute uptime % and avg latency for the period.
+    //                          SUM(Status = 'Online') uses MySQL boolean arithmetic — the comparison
+    //                          returns 1 (true) or 0 (false), so SUM effectively counts matching rows.
+    //   Query 2 (deviceStats): Counts distinct devices that generated logs in the period
+    //                          (i.e., actively scanned devices — not just all registered ones).
+    //   Query 3 (liveStats):   Live snapshot from the DEVICE table — used as a fallback when
+    //                          no historical logs exist yet (e.g., the system just started).
+    //   Query 4 (alertRows):   Counts alerts grouped by severity for the doughnut breakdown chart.
     const [[logStats]] = await dbPool.execute(
       `SELECT
          COUNT(*) AS totalLogs,
@@ -2256,6 +2313,9 @@ app.get('/api/analytics/latency-trend', requireAuth, async (req, res) => {
     }
     params.push(period.days);
 
+    // Groups log entries into time buckets (hourly for 24h, daily for 7d/30d) and
+    // computes avg/min/max latency per bucket. Only Online entries with a recorded
+    // LatencyMs are included — offline pings report null latency and are excluded.
     const [rows] = await dbPool.execute(
       `SELECT
          DATE_FORMAT(CreatedAt, '${bucketFmt}') AS bucket,
@@ -2296,6 +2356,13 @@ app.get('/api/analytics/device-uptime', requireAuth, async (req, res) => {
   if (!period) return res.status(400).json({ error: 'Invalid period. Use 24h, 7d, or 30d.' });
 
   try {
+    // Single query joining DEVICE_LOG, DEVICE, and LOCATION to compute per-device stats.
+    // SUM(dl.Status = 'Online') / COUNT(*) gives the online ratio (uptime %) per device,
+    // again using MySQL boolean arithmetic where the comparison evaluates to 1 or 0.
+    // The correlated subquery counts alerts per device within the same time period,
+    // avoiding a separate query and keeping the result set to one row per device.
+    // ORDER BY the online ratio ASC so the worst-performing devices appear first in the table.
+    // period.days is bound twice: once for the correlated ALERT subquery, once for the main WHERE.
     const [rows] = await dbPool.execute(
       `SELECT
          dl.DeviceID,
@@ -2351,6 +2418,7 @@ app.get('/api/analytics/alerts-summary', requireAuth, async (req, res) => {
   if (!period) return res.status(400).json({ error: 'Invalid period. Use 24h, 7d, or 30d.' });
 
   try {
+    // Query 1: Count alerts grouped by type and severity — powers the breakdown chart.
     const [byType] = await dbPool.execute(
       `SELECT AlertType, Severity, COUNT(*) AS cnt
        FROM ALERT
@@ -2360,6 +2428,7 @@ app.get('/api/analytics/alerts-summary', requireAuth, async (req, res) => {
       [period.days]
     );
 
+    // Query 2: Rank the top 5 devices by alert frequency to highlight problem nodes.
     const [topDevices] = await dbPool.execute(
       `SELECT a.DeviceID, d.DeviceName, d.IPAddress, COUNT(*) AS alertCount
        FROM ALERT a
@@ -2421,6 +2490,102 @@ app.put('/api/auth/profile', requireAuth, async (req, res) => {
   } catch (error) {
     console.error('Profile update error:', error);
     return res.status(500).json({ error: 'Unable to update profile right now.' });
+  }
+});
+
+// ---- User Management (Admin only) ----
+
+// List all user accounts
+app.get('/api/users', requireAuth, requireRole('Admin'), async (req, res) => {
+  try {
+    const [rows] = await dbPool.execute(
+      'SELECT UserID, FullName, Email, Role, CreatedAt FROM USERS ORDER BY CreatedAt DESC'
+    );
+    return res.json(rows.map(r => ({
+      id: r.UserID,
+      fullName: r.FullName,
+      email: r.Email,
+      role: r.Role,
+      createdAt: r.CreatedAt
+    })));
+  } catch (error) {
+    console.error('Users list error:', error);
+    return res.status(500).json({ error: 'Unable to load users.' });
+  }
+});
+
+// Change a user's role
+app.put('/api/users/:id/role', requireAuth, requireRole('Admin'), async (req, res) => {
+  const targetId = Number(req.params.id);
+  if (!Number.isInteger(targetId) || targetId <= 0) {
+    return res.status(400).json({ error: 'Invalid user ID.' });
+  }
+
+  const { role } = req.body || {};
+  if (role !== 'Admin' && role !== 'ITStaff') {
+    return res.status(400).json({ error: 'Role must be Admin or ITStaff.' });
+  }
+
+  if (targetId === req.session.user.userId) {
+    return res.status(400).json({ error: 'You cannot change your own role.' });
+  }
+
+  try {
+    const [rows] = await dbPool.execute('SELECT FullName, Email FROM USERS WHERE UserID = ? LIMIT 1', [targetId]);
+    if (!rows.length) return res.status(404).json({ error: 'User not found.' });
+
+    await dbPool.execute('UPDATE USERS SET Role = ? WHERE UserID = ?', [role, targetId]);
+    logActivity(req, 'user_role_changed', `${rows[0].FullName} (${rows[0].Email}) → ${role}`);
+    return res.json({ ok: true, role });
+  } catch (error) {
+    console.error('Role change error:', error);
+    return res.status(500).json({ error: 'Unable to update role.' });
+  }
+});
+
+// Delete a user account
+app.delete('/api/users/:id', requireAuth, requireRole('Admin'), async (req, res) => {
+  const targetId = Number(req.params.id);
+  if (!Number.isInteger(targetId) || targetId <= 0) {
+    return res.status(400).json({ error: 'Invalid user ID.' });
+  }
+
+  if (targetId === req.session.user.userId) {
+    return res.status(400).json({ error: 'You cannot delete your own account.' });
+  }
+
+  try {
+    const [rows] = await dbPool.execute('SELECT FullName, Email FROM USERS WHERE UserID = ? LIMIT 1', [targetId]);
+    if (!rows.length) return res.status(404).json({ error: 'User not found.' });
+
+    await dbPool.execute('DELETE FROM USERS WHERE UserID = ?', [targetId]);
+    logActivity(req, 'user_deleted', `${rows[0].FullName} (${rows[0].Email})`);
+    return res.json({ ok: true });
+  } catch (error) {
+    console.error('User delete error:', error);
+    return res.status(500).json({ error: 'Unable to delete user.' });
+  }
+});
+
+// ---- Activity Log (Admin only) ----
+
+app.get('/api/activity-logs', requireAuth, requireRole('Admin'), async (req, res) => {
+  const limit = Math.min(Number(req.query.limit) || 100, 500);
+  const offset = Number(req.query.offset) || 0;
+  if (!Number.isFinite(limit) || !Number.isFinite(offset)) {
+    return res.status(400).json({ error: 'Invalid pagination parameters.' });
+  }
+
+  try {
+    const [rows] = await dbPool.execute(
+      'SELECT LogID, UserID, FullName, Action, Details, IPAddress, CreatedAt FROM activity_logs ORDER BY CreatedAt DESC LIMIT ? OFFSET ?',
+      [limit, offset]
+    );
+    const [[{ total }]] = await dbPool.execute('SELECT COUNT(*) AS total FROM activity_logs');
+    return res.json({ logs: rows, total: Number(total), limit, offset });
+  } catch (error) {
+    console.error('Activity log error:', error);
+    return res.status(500).json({ error: 'Unable to load activity logs.' });
   }
 });
 
@@ -2499,6 +2664,27 @@ async function runMigrations() {
     } else {
       console.error('Migration error (ContactNumber):', err.message);
     }
+  }
+
+  // Step 6: Create activity_logs table for audit trail
+  try {
+    await dbPool.execute(`
+      CREATE TABLE IF NOT EXISTS activity_logs (
+        LogID INT UNSIGNED NOT NULL AUTO_INCREMENT,
+        UserID INT UNSIGNED DEFAULT NULL,
+        FullName VARCHAR(160) DEFAULT NULL,
+        Action VARCHAR(100) NOT NULL,
+        Details TEXT DEFAULT NULL,
+        IPAddress VARCHAR(45) DEFAULT NULL,
+        CreatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (LogID),
+        KEY idx_actlog_user (UserID),
+        KEY idx_actlog_created (CreatedAt)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    `);
+    console.log('Migration: activity_logs table ensured.');
+  } catch (err) {
+    console.error('Migration error (activity_logs):', err.message);
   }
 }
 
