@@ -1,0 +1,591 @@
+Scheduled discovery scan error: Error: Duplicate entry 'e0-bd-a0-80-db-90' for key 'uniq_device_mac'
+    at upsertDiscoveredDevice (C:\Projects\smartCampus\server\server.js:669:18)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async discoverNetworkDevices (C:\Projects\smartCampus\server\server.js:1294:22)
+    at async runScheduledDiscoveryScan (C:\Projects\smartCampus\server\server.js:1451:20) {
+  code: 'ER_DUP_ENTRY',
+  errno: 1062,
+  sqlState: '23000',
+  sqlMessage: "Duplicate entry 'e0-bd-a0-80-db-90' for key 'uniq_device_mac'",
+  sql: 'UPDATE DEVICE SET DeviceName = ?, DeviceType = ?, IPAddress = ?, MACAddress = ?, Manufacturer = ?, Model = ?, Status = ?, LastSeen = ?, LocationID = ? WHERE DeviceID = ?'
+}
+Scheduled discovery scan error: Error: Duplicate entry 'e0-bd-a0-80-db-90' for key 'uniq_device_mac'
+    at upsertDiscoveredDevice (C:\Projects\smartCampus\server\server.js:669:18)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async discoverNetworkDevices (C:\Projects\smartCampus\server\server.js:1294:22)
+    at async Timeout.runScheduledDiscoveryScan [as _onTimeout] (C:\Projects\smartCampus\server\server.js:1451:20) {
+  code: 'ER_DUP_ENTRY',
+  errno: 1062,
+  sqlState: '23000',
+  sqlMessage: "Duplicate entry 'e0-bd-a0-80-db-90' for key 'uniq_device_mac'",
+  sql: 'UPDATE DEVICE SET DeviceName = ?, DeviceType = ?, IPAddress = ?, MACAddress = ?, Manufacturer = ?, Model = ?, Status = ?, LastSeen = ?, LocationID = ? WHERE DeviceID = ?'
+}
+Continuous ping sweep error: AggregateError: 
+    at Timeout.runContinuousPingSweep [as _onTimeout] (C:\Projects\smartCampus\server\server.js:1473:33)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7) {
+  code: 'ECONNREFUSED',
+  fatal: true,
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:4306
+        at createConnectionError (node:net:1686:14)
+        at afterConnectMultiple (node:net:1716:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 4306
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:4306
+        at createConnectionError (node:net:1686:14)
+        at afterConnectMultiple (node:net:1716:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 4306
+    }
+  ]
+}
+Continuous ping sweep error: AggregateError: 
+    at Timeout.runContinuousPingSweep [as _onTimeout] (C:\Projects\smartCampus\server\server.js:1473:33)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7) {
+  code: 'ECONNREFUSED',
+  fatal: true,
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:4306
+        at createConnectionError (node:net:1686:14)
+        at afterConnectMultiple (node:net:1716:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 4306
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:4306
+        at createConnectionError (node:net:1686:14)
+        at afterConnectMultiple (node:net:1716:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 4306
+    }
+  ]
+}
+Continuous ping sweep error: AggregateError: 
+    at Timeout.runContinuousPingSweep [as _onTimeout] (C:\Projects\smartCampus\server\server.js:1473:33)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7) {
+  code: 'ECONNREFUSED',
+  fatal: true,
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:4306
+        at createConnectionError (node:net:1686:14)
+        at afterConnectMultiple (node:net:1716:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 4306
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:4306
+        at createConnectionError (node:net:1686:14)
+        at afterConnectMultiple (node:net:1716:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 4306
+    }
+  ]
+}
+Scheduled router scan error: AggregateError: 
+    at findDeviceByIpOrMac (C:\Projects\smartCampus\server\server.js:539:31)
+    at upsertDeviceSnapshot (C:\Projects\smartCampus\server\server.js:586:26)
+    at Timeout.runScheduledRouterScan [as _onTimeout] (C:\Projects\smartCampus\server\server.js:1433:11)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
+  code: 'ECONNREFUSED',
+  fatal: true,
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:4306
+        at createConnectionError (node:net:1686:14)
+        at afterConnectMultiple (node:net:1716:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 4306
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:4306
+        at createConnectionError (node:net:1686:14)
+        at afterConnectMultiple (node:net:1716:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 4306
+    }
+  ]
+}
+Continuous ping sweep error: AggregateError: 
+    at Timeout.runContinuousPingSweep [as _onTimeout] (C:\Projects\smartCampus\server\server.js:1473:33)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7) {
+  code: 'ECONNREFUSED',
+  fatal: true,
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:4306
+        at createConnectionError (node:net:1686:14)
+        at afterConnectMultiple (node:net:1716:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 4306
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:4306
+        at createConnectionError (node:net:1686:14)
+        at afterConnectMultiple (node:net:1716:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 4306
+    }
+  ]
+}
+Continuous ping sweep error: AggregateError: 
+    at Timeout.runContinuousPingSweep [as _onTimeout] (C:\Projects\smartCampus\server\server.js:1473:33)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7) {
+  code: 'ECONNREFUSED',
+  fatal: true,
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:4306
+        at createConnectionError (node:net:1686:14)
+        at afterConnectMultiple (node:net:1716:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 4306
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:4306
+        at createConnectionError (node:net:1686:14)
+        at afterConnectMultiple (node:net:1716:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 4306
+    }
+  ]
+}
+Scheduled device ping sweep error: AggregateError: 
+    at Timeout.runScheduledDevicePingSweep [as _onTimeout] (C:\Projects\smartCampus\server\server.js:1696:33)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7) {
+  code: 'ECONNREFUSED',
+  fatal: true,
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:4306
+        at createConnectionError (node:net:1686:14)
+        at afterConnectMultiple (node:net:1716:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 4306
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:4306
+        at createConnectionError (node:net:1686:14)
+        at afterConnectMultiple (node:net:1716:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 4306
+    }
+  ]
+}
+Continuous ping sweep error: AggregateError: 
+    at Timeout.runContinuousPingSweep [as _onTimeout] (C:\Projects\smartCampus\server\server.js:1473:33)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7) {
+  code: 'ECONNREFUSED',
+  fatal: true,
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:4306
+        at createConnectionError (node:net:1686:14)
+        at afterConnectMultiple (node:net:1716:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 4306
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:4306
+        at createConnectionError (node:net:1686:14)
+        at afterConnectMultiple (node:net:1716:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 4306
+    }
+  ]
+}
+Continuous ping sweep error: AggregateError: 
+    at Timeout.runContinuousPingSweep [as _onTimeout] (C:\Projects\smartCampus\server\server.js:1473:33)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7) {
+  code: 'ECONNREFUSED',
+  fatal: true,
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:4306
+        at createConnectionError (node:net:1686:14)
+        at afterConnectMultiple (node:net:1716:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 4306
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:4306
+        at createConnectionError (node:net:1686:14)
+        at afterConnectMultiple (node:net:1716:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 4306
+    }
+  ]
+}
+Continuous ping sweep error: AggregateError: 
+    at Timeout.runContinuousPingSweep [as _onTimeout] (C:\Projects\smartCampus\server\server.js:1473:33)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7) {
+  code: 'ECONNREFUSED',
+  fatal: true,
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:4306
+        at createConnectionError (node:net:1686:14)
+        at afterConnectMultiple (node:net:1716:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 4306
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:4306
+        at createConnectionError (node:net:1686:14)
+        at afterConnectMultiple (node:net:1716:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 4306
+    }
+  ]
+}
+Continuous ping sweep error: AggregateError: 
+    at Timeout.runContinuousPingSweep [as _onTimeout] (C:\Projects\smartCampus\server\server.js:1473:33)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7) {
+  code: 'ECONNREFUSED',
+  fatal: true,
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:4306
+        at createConnectionError (node:net:1686:14)
+        at afterConnectMultiple (node:net:1716:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 4306
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:4306
+        at createConnectionError (node:net:1686:14)
+        at afterConnectMultiple (node:net:1716:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 4306
+    }
+  ]
+}
+Continuous ping sweep error: AggregateError: 
+    at Timeout.runContinuousPingSweep [as _onTimeout] (C:\Projects\smartCampus\server\server.js:1473:33)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7) {
+  code: 'ECONNREFUSED',
+  fatal: true,
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:4306
+        at createConnectionError (node:net:1686:14)
+        at afterConnectMultiple (node:net:1716:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 4306
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:4306
+        at createConnectionError (node:net:1686:14)
+        at afterConnectMultiple (node:net:1716:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 4306
+    }
+  ]
+}
+Continuous ping sweep error: AggregateError: 
+    at Timeout.runContinuousPingSweep [as _onTimeout] (C:\Projects\smartCampus\server\server.js:1473:33)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7) {
+  code: 'ECONNREFUSED',
+  fatal: true,
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:4306
+        at createConnectionError (node:net:1686:14)
+        at afterConnectMultiple (node:net:1716:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 4306
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:4306
+        at createConnectionError (node:net:1686:14)
+        at afterConnectMultiple (node:net:1716:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 4306
+    }
+  ]
+}
+Scheduled router scan error: AggregateError: 
+    at findDeviceByIpOrMac (C:\Projects\smartCampus\server\server.js:539:31)
+    at upsertDeviceSnapshot (C:\Projects\smartCampus\server\server.js:586:26)
+    at Timeout.runScheduledRouterScan [as _onTimeout] (C:\Projects\smartCampus\server\server.js:1433:11)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
+  code: 'ECONNREFUSED',
+  fatal: true,
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:4306
+        at createConnectionError (node:net:1686:14)
+        at afterConnectMultiple (node:net:1716:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 4306
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:4306
+        at createConnectionError (node:net:1686:14)
+        at afterConnectMultiple (node:net:1716:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 4306
+    }
+  ]
+}
+Continuous ping sweep error: AggregateError: 
+    at Timeout.runContinuousPingSweep [as _onTimeout] (C:\Projects\smartCampus\server\server.js:1473:33)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7) {
+  code: 'ECONNREFUSED',
+  fatal: true,
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:4306
+        at createConnectionError (node:net:1686:14)
+        at afterConnectMultiple (node:net:1716:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 4306
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:4306
+        at createConnectionError (node:net:1686:14)
+        at afterConnectMultiple (node:net:1716:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 4306
+    }
+  ]
+}
+Continuous ping sweep error: AggregateError: 
+    at Timeout.runContinuousPingSweep [as _onTimeout] (C:\Projects\smartCampus\server\server.js:1473:33)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7) {
+  code: 'ECONNREFUSED',
+  fatal: true,
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:4306
+        at createConnectionError (node:net:1686:14)
+        at afterConnectMultiple (node:net:1716:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 4306
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:4306
+        at createConnectionError (node:net:1686:14)
+        at afterConnectMultiple (node:net:1716:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 4306
+    }
+  ]
+}
+Scheduled device ping sweep error: AggregateError: 
+    at Timeout.runScheduledDevicePingSweep [as _onTimeout] (C:\Projects\smartCampus\server\server.js:1696:33)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7) {
+  code: 'ECONNREFUSED',
+  fatal: true,
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:4306
+        at createConnectionError (node:net:1686:14)
+        at afterConnectMultiple (node:net:1716:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 4306
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:4306
+        at createConnectionError (node:net:1686:14)
+        at afterConnectMultiple (node:net:1716:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 4306
+    }
+  ]
+}
+Continuous ping sweep error: AggregateError: 
+    at Timeout.runContinuousPingSweep [as _onTimeout] (C:\Projects\smartCampus\server\server.js:1473:33)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7) {
+  code: 'ECONNREFUSED',
+  fatal: true,
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:4306
+        at createConnectionError (node:net:1686:14)
+        at afterConnectMultiple (node:net:1716:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 4306
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:4306
+        at createConnectionError (node:net:1686:14)
+        at afterConnectMultiple (node:net:1716:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 4306
+    }
+  ]
+}
+Continuous ping sweep error: AggregateError: 
+    at Timeout.runContinuousPingSweep [as _onTimeout] (C:\Projects\smartCampus\server\server.js:1473:33)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7) {
+  code: 'ECONNREFUSED',
+  fatal: true,
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:4306
+        at createConnectionError (node:net:1686:14)
+        at afterConnectMultiple (node:net:1716:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 4306
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:4306
+        at createConnectionError (node:net:1686:14)
+        at afterConnectMultiple (node:net:1716:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 4306
+    }
+  ]
+}
+Continuous ping sweep error: AggregateError: 
+    at Timeout.runContinuousPingSweep [as _onTimeout] (C:\Projects\smartCampus\server\server.js:1473:33)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7) {
+  code: 'ECONNREFUSED',
+  fatal: true,
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:4306
+        at createConnectionError (node:net:1686:14)
+        at afterConnectMultiple (node:net:1716:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 4306
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:4306
+        at createConnectionError (node:net:1686:14)
+        at afterConnectMultiple (node:net:1716:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 4306
+    }
+  ]
+}
+Continuous ping sweep error: AggregateError: 
+    at Timeout.runContinuousPingSweep [as _onTimeout] (C:\Projects\smartCampus\server\server.js:1473:33)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7) {
+  code: 'ECONNREFUSED',
+  fatal: true,
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:4306
+        at createConnectionError (node:net:1686:14)
+        at afterConnectMultiple (node:net:1716:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 4306
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:4306
+        at createConnectionError (node:net:1686:14)
+        at afterConnectMultiple (node:net:1716:16) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 4306
+    }
+  ]
+}

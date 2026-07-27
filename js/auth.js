@@ -1,5 +1,4 @@
-const authHost = window.location.hostname || 'localhost';
-const AUTH_API_BASE = window.AUTH_API_BASE || `http://${authHost}:4000`;
+const AUTH_API_BASE = window.AUTH_API_BASE || window.location.origin;
 const currentPath = window.location.pathname;
 const isAuthPage = currentPath.endsWith('login.html') || currentPath.endsWith('signup.html');
 

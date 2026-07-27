@@ -12,6 +12,8 @@ const ping = require('ping');
 const snmp = require('net-snmp');
 const { Server } = require('socket.io');
 const nodemailer = require('nodemailer');
+const rateLimit = require('express-rate-limit');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 // Load environment variables from server/.env
 require('dotenv').config({ path: path.join(__dirname, '.env') });
@@ -20,10 +22,15 @@ require('dotenv').config({ path: path.join(__dirname, '.env') });
 const app = express();
 const PORT = process.env.PORT || 4000;
 const httpServer = http.createServer(app);
+
+// Allowed origins for CORS — comma-separated env var, or localhost fallback
+const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || 'http://localhost:3000,http://127.0.0.1:3000')
+  .split(',').map(o => o.trim()).filter(Boolean);
+
 // Socket.IO server for real-time topology updates
 const io = new Server(httpServer, {
   cors: {
-    origin: true,
+    origin: ALLOWED_ORIGINS,
     credentials: true
   }
 });
@@ -96,7 +103,7 @@ const abnormalEmailCooldowns = new Map();
 const ABNORMAL_EMAIL_COOLDOWN_MS = 5 * 60 * 1000;
 
 // HTTP middleware and session configuration
-app.use(cors({ origin: true, credentials: true }));
+app.use(cors({ origin: ALLOWED_ORIGINS, credentials: true }));
 app.use(express.json({ limit: '64kb' }));
 app.use(session({
   secret: SESSION_SECRET,
@@ -104,11 +111,14 @@ app.use(session({
   saveUninitialized: false,
   cookie: {
     httpOnly: true,
-    sameSite: 'lax',
+    sameSite: 'strict',
     secure: SESSION_COOKIE_SECURE,
     maxAge: SESSION_MAX_AGE_MS
   }
 }));
+
+// Serve frontend static files (html/, js/, css/, images/, components/) from project root
+app.use(express.static(path.join(__dirname, '..')));
 
 // Initial socket handshake
 io.on('connection', (socket) => {
@@ -1348,8 +1358,30 @@ let continuousPingInFlight = false;
 let scanningEnabled = SCHEDULED_SCANS_ENABLED;
 const CONTINUOUS_PING_INTERVAL_MS = 2000;
 const DEVICE_PING_LOG_INTERVAL_MS = Number(process.env.DEVICE_PING_LOG_INTERVAL_MS || ROUTER_SCAN_INTERVAL_MS);
-const OFFLINE_THRESHOLD = 3;   // consecutive failures before declaring offline
-const RECOVERY_THRESHOLD = 2;  // consecutive successes before declaring recovered
+
+// ── Alert staging thresholds ────────────────────────────────────────────────
+// All counts are consecutive ping failures/successes; each ping = 2 s.
+//
+// Downtime pipeline:
+//   Stage 0 → Stage 1 (Silent)   : OFFLINE_THRESHOLD  failures  →  ~6 s   — internal only
+//   Stage 1 → Stage 2 (Warning)  : OFFLINE_WARN       failures  →  ~30 s  — socket + DB, no email
+//   Stage 2 → Stage 3 (Critical) : OFFLINE_CRIT       failures  →  ~5 min — socket + DB + email
+//   Fast-track to Critical       : OFFLINE_FREQ_COUNT incidents in OFFLINE_FREQ_WINDOW_MS
+//
+// Latency pipeline:
+//   Warning  : LATENCY_WARN_PINGS consecutive ≥ LATENCY_WARN_MS             → ~10 s  — socket + DB
+//   Critical : LATENCY_CRIT_PINGS consecutive  OR  any ping ≥ LATENCY_CRIT_MS → ~60 s  — socket + DB + email
+const OFFLINE_THRESHOLD     = 3;               // ~6 s  — internal state change
+const OFFLINE_WARN          = 15;              // ~30 s — Warning alert
+const OFFLINE_CRIT          = 150;             // ~5 min — Critical alert + email
+const OFFLINE_FREQ_WINDOW_MS = 30 * 60 * 1000; // 30-minute window for frequency check
+const OFFLINE_FREQ_COUNT    = 3;               // incidents in window → immediate Critical
+const RECOVERY_THRESHOLD    = 2;               // consecutive successes before declaring recovered
+const LATENCY_WARN_MS       = 200;             // ms threshold for high-latency watch
+const LATENCY_CRIT_MS       = 500;             // ms threshold for immediate Critical
+const LATENCY_WARN_PINGS    = 5;               // ~10 s consecutive → Warning
+const LATENCY_CRIT_PINGS    = 30;              // ~60 s consecutive → Critical
+
 const realtimeDeviceStates = new Map(); // In-memory map for real-time alerting
 
 function setScanningEnabled(enabled) {
@@ -1441,13 +1473,20 @@ async function runContinuousPingSweep() {
     const [rows] = await dbPool.execute('SELECT DeviceID, IPAddress, DeviceName, Status FROM DEVICE');
     if (!rows || rows.length === 0) return;
 
-    // Debounce algorithm — prevents false alerts from temporary packet loss:
-    //   - A device is only declared Offline after OFFLINE_THRESHOLD (3) consecutive
-    //     failed pings. This tolerates brief network hiccups without triggering alerts.
-    //   - A device is only declared Online (recovered) after RECOVERY_THRESHOLD (2)
-    //     consecutive successful pings. This prevents flickering alerts on unstable links.
-    //   - Per-device state (failCount, successCount, confirmedStatus) is stored in
-    //     the realtimeDeviceStates Map and persists between sweep cycles.
+    // Three-stage alert pipeline — prevents false TSSU notifications from transient outages:
+    //
+    //   Stage 1 (Silent, ~6 s)   — device declared Offline internally; no external alert.
+    //                               Handles brief power blips, single packet drops, reboots.
+    //   Stage 2 (Warning, ~30 s) — outage confirmed as non-transient; dashboard notified,
+    //                               TSSU is NOT yet emailed. Staff can see it but no action required.
+    //   Stage 3 (Critical, 5 min or 3× in 30 min) — email sent to TSSU. Downstream impact
+    //                               is assessed and included in the message.
+    //
+    //   Latency follows the same philosophy: a single spike is ignored; sustained degradation
+    //   (≥10 s) warns the dashboard; prolonged (≥60 s) or severe (≥500 ms) emails TSSU.
+    //
+    //   Recovery is silent if the incident never left Stage 1. If Stage 2+ was reached,
+    //   recovery includes how long the device was offline.
     const results = await runWithConcurrency(rows, 20, async (device) => {
       const target = device.IPAddress;
       if (!isValidIp(target)) return null;
@@ -1457,88 +1496,159 @@ async function runContinuousPingSweep() {
       const alive = icmp.ok && icmp.alive;
       const latency = icmp.ok ? icmp.timeMs : null;
 
-      // Get or initialize debounce state for this device
+      // Get or initialize per-device alert state
       const prevState = realtimeDeviceStates.get(device.DeviceID) || {
         status: device.Status || 'Online',
         latency: null,
         failCount: 0,
-        successCount: 0
+        successCount: 0,
+        alertStage: 0,        // 0=none 1=silent 2=warned 3=critical
+        highLatencyCount: 0,  // consecutive pings above LATENCY_WARN_MS
+        latencyAlertStage: 0, // 0=none 1=warned 2=critical
+        incidentLog: [],      // timestamps of recent downtime starts
+        downtimeStart: null   // when the current outage began
       };
 
-      let failCount = prevState.failCount;
-      let successCount = prevState.successCount;
-      let confirmedStatus = prevState.status;
+      let failCount         = prevState.failCount         || 0;
+      let successCount      = prevState.successCount      || 0;
+      let confirmedStatus   = prevState.status            || 'Online';
+      let alertStage        = prevState.alertStage        || 0;
+      let highLatencyCount  = prevState.highLatencyCount  || 0;
+      let latencyAlertStage = prevState.latencyAlertStage || 0;
+      let incidentLog       = prevState.incidentLog       || [];
+      let downtimeStart     = prevState.downtimeStart     || null;
+
+      const now = Date.now();
 
       if (alive) {
-        // Reset failure streak, increment success streak
-        failCount = 0;
+        failCount    = 0;
         successCount += 1;
 
-        // Only transition to Online after enough consecutive successes
-        if (confirmedStatus !== 'Online' && successCount >= RECOVERY_THRESHOLD) {
-          confirmedStatus = 'Online';
-          // Recovery Alert
-          const recoveryMsg = `Device ${device.DeviceName || target} is back online.`;
-          io.emit('alert:new', {
-            type: 'recovery',
-            severity: 'success',
-            message: recoveryMsg,
-            deviceId: device.DeviceID,
-            deviceName: device.DeviceName || target,
-            time: new Date().toISOString()
-          });
-          insertAlert('recovery', 'success', recoveryMsg, device.DeviceID);
-          sendAlertEmail('recovery', 'success', recoveryMsg, device.DeviceName || target, device.DeviceID);
+        // ── Latency staging (only while confirmed online) ───────────────────
+        if (confirmedStatus === 'Online' && latency !== null) {
+          if (latency >= LATENCY_WARN_MS) {
+            highLatencyCount += 1;
+
+            // Warning: sustained high latency (~10 s)
+            if (highLatencyCount === LATENCY_WARN_PINGS && latencyAlertStage < 1) {
+              latencyAlertStage = 1;
+              const warnLatMsg = `Sustained high latency (${latency} ms) on ${device.DeviceName || target} — persisting for ~10 seconds.`;
+              io.emit('alert:new', {
+                type: 'abnormal', severity: 'warning', stage: 'warn',
+                message: warnLatMsg, deviceId: device.DeviceID,
+                deviceName: device.DeviceName || target, time: new Date().toISOString()
+              });
+              insertAlert('abnormal', 'warning', warnLatMsg, device.DeviceID);
+            }
+
+            // Critical: very long (~60 s) OR severe single spike (≥500 ms)
+            if ((highLatencyCount >= LATENCY_CRIT_PINGS || latency >= LATENCY_CRIT_MS) && latencyAlertStage < 2) {
+              latencyAlertStage = 2;
+              const critLatMsg = latency >= LATENCY_CRIT_MS
+                ? `Critical latency (${latency} ms) on ${device.DeviceName || target} — exceeds acceptable threshold.`
+                : `Prolonged high latency on ${device.DeviceName || target} (${latency} ms) — degraded for ~1 minute.`;
+              io.emit('alert:new', {
+                type: 'abnormal', severity: 'danger', stage: 'critical',
+                message: critLatMsg, deviceId: device.DeviceID,
+                deviceName: device.DeviceName || target, time: new Date().toISOString()
+              });
+              insertAlert('abnormal', 'danger', critLatMsg, device.DeviceID);
+              sendAlertEmail('abnormal', 'danger', critLatMsg, device.DeviceName || target, device.DeviceID);
+            }
+          } else {
+            // Latency back to normal — reset counters
+            highLatencyCount  = 0;
+            latencyAlertStage = 0;
+          }
         }
 
-        // Latency spike alert (only when confirmed online)
-        if (confirmedStatus === 'Online' && latency !== null && latency >= 200) {
-          if (prevState.latency === null || prevState.latency < 200) {
-            const abnormalMsg = `High latency (${latency}ms) detected on ${device.DeviceName || target}.`;
+        // ── Recovery from offline ───────────────────────────────────────────
+        if (confirmedStatus !== 'Online' && successCount >= RECOVERY_THRESHOLD) {
+          const prevAlertStage = alertStage;
+          confirmedStatus   = 'Online';
+          alertStage        = 0;
+          highLatencyCount  = 0;
+          latencyAlertStage = 0;
+
+          // Only notify if the incident reached Warning or Critical (Stage ≥ 2);
+          // silent incidents (Stage 1) need no recovery message.
+          if (prevAlertStage >= 2) {
+            const offlineSec = downtimeStart ? Math.round((now - downtimeStart) / 1000) : null;
+            const durationStr = offlineSec !== null
+              ? (offlineSec >= 60
+                  ? ` (offline for ${Math.floor(offlineSec / 60)}m ${offlineSec % 60}s)`
+                  : ` (offline for ${offlineSec}s)`)
+              : '';
+            const recoveryMsg = `Device ${device.DeviceName || target} is back online${durationStr}.`;
             io.emit('alert:new', {
-              type: 'abnormal',
-              severity: 'warning',
-              message: abnormalMsg,
-              deviceId: device.DeviceID,
-              deviceName: device.DeviceName || target,
-              time: new Date().toISOString()
+              type: 'recovery', severity: 'success', stage: 'resolved',
+              message: recoveryMsg, deviceId: device.DeviceID,
+              deviceName: device.DeviceName || target, time: new Date().toISOString()
             });
-            insertAlert('abnormal', 'warning', abnormalMsg, device.DeviceID);
-            sendAlertEmail('abnormal', 'warning', abnormalMsg, device.DeviceName || target, device.DeviceID);
+            insertAlert('recovery', 'success', recoveryMsg, device.DeviceID);
+            sendAlertEmail('recovery', 'success', recoveryMsg, device.DeviceName || target, device.DeviceID);
           }
+          downtimeStart = null;
         }
       } else {
-        // Reset success streak and latency
         successCount = 0;
-        failCount += 1;
+        failCount   += 1;
 
-        // Only transition to Offline after enough consecutive failures
-        if (confirmedStatus !== 'Offline' && failCount >= OFFLINE_THRESHOLD) {
+        // Purge incident history outside the frequency window to keep memory bounded
+        incidentLog = incidentLog.filter(t => now - t < OFFLINE_FREQ_WINDOW_MS);
+
+        // ── Stage 1 — Silent (~6 s): internal state change, no external alert ──
+        if (alertStage === 0 && failCount >= OFFLINE_THRESHOLD) {
+          alertStage      = 1;
           confirmedStatus = 'Offline';
+          downtimeStart   = now;
+          incidentLog     = [...incidentLog, now]; // record this incident start
+        }
 
-          // Check if this device has active downstream connections — escalate to CRITICAL if so
-          let impactMessage = `Device ${device.DeviceName || target} went offline.`;
-          try {
-            const [connRows] = await dbPool.execute('SELECT COUNT(*) as downstreamCount FROM DEVICE_CONNECTION WHERE SourceDeviceID = ? AND IsActive = 1', [device.DeviceID]);
-            const count = connRows[0].downstreamCount;
-            if (count > 0) {
-              impactMessage = `CRITICAL: Device ${device.DeviceName || target} went offline. WARNING: ${count} downstream device(s) lost connectivity as a result!`;
-            }
-          } catch (err) {
-            console.error('Impact assessment error:', err);
-          }
-
-          // Downtime Alert
+        // ── Stage 2 — Warning (~30 s): dashboard alert, TSSU not emailed ──────
+        if (alertStage === 1 && failCount >= OFFLINE_WARN) {
+          alertStage = 2;
+          const warnMsg = `Device ${device.DeviceName || target} has been offline for ~30 seconds.`;
           io.emit('alert:new', {
-            type: 'downtime',
-            severity: 'danger',
-            message: impactMessage,
-            deviceId: device.DeviceID,
-            deviceName: device.DeviceName || target,
-            time: new Date().toISOString()
+            type: 'downtime', severity: 'warning', stage: 'warn',
+            message: warnMsg, deviceId: device.DeviceID,
+            deviceName: device.DeviceName || target, time: new Date().toISOString()
           });
-          insertAlert('downtime', 'danger', impactMessage, device.DeviceID);
-          sendAlertEmail('downtime', 'danger', impactMessage, device.DeviceName || target, device.DeviceID);
+          insertAlert('downtime', 'warning', warnMsg, device.DeviceID);
+        }
+
+        // ── Stage 3 — Critical (5 min or repeat flapping): email TSSU ─────────
+        if (alertStage === 2) {
+          const isLongOutage = failCount >= OFFLINE_CRIT;
+          const isFrequent   = incidentLog.length >= OFFLINE_FREQ_COUNT;
+
+          if (isLongOutage || isFrequent) {
+            alertStage = 3;
+
+            let critMsg = isFrequent
+              ? `Device ${device.DeviceName || target} has gone offline ${incidentLog.length} times in the last 30 minutes — possible hardware or connectivity instability.`
+              : `Device ${device.DeviceName || target} has been offline for 5+ minutes. Immediate attention required.`;
+
+            // Assess downstream impact and append to message
+            try {
+              const [connRows] = await dbPool.execute(
+                'SELECT COUNT(*) AS downstreamCount FROM DEVICE_CONNECTION WHERE SourceDeviceID = ? AND IsActive = 1',
+                [device.DeviceID]
+              );
+              const count = Number(connRows[0].downstreamCount);
+              if (count > 0) critMsg += ` ${count} downstream device(s) may be affected.`;
+            } catch (err) {
+              console.error('Impact assessment error:', err);
+            }
+
+            io.emit('alert:new', {
+              type: 'downtime', severity: 'danger', stage: 'critical',
+              message: critMsg, deviceId: device.DeviceID,
+              deviceName: device.DeviceName || target, time: new Date().toISOString()
+            });
+            insertAlert('downtime', 'danger', critMsg, device.DeviceID);
+            sendAlertEmail('downtime', 'danger', critMsg, device.DeviceName || target, device.DeviceID);
+          }
         }
       }
 
@@ -1546,7 +1656,12 @@ async function runContinuousPingSweep() {
         status: confirmedStatus,
         latency,
         failCount,
-        successCount
+        successCount,
+        alertStage,
+        highLatencyCount,
+        latencyAlertStage,
+        incidentLog,
+        downtimeStart
       });
 
       return {
@@ -1693,8 +1808,17 @@ app.get('/api/auth/me', (req, res) => {
   return res.json(req.session.user);
 });
 
+// Rate limiter: 5 attempts per 15 minutes for auth endpoints
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many attempts. Please try again in 15 minutes.' }
+});
+
 // Register a new user account
-app.post('/api/auth/register', async (req, res) => {
+app.post('/api/auth/register', authLimiter, async (req, res) => {
   const { firstName, lastName, email, password } = req.body || {};
   const safeEmail = normalizeEmail(email);
   const safeFirstName = normalizeName(firstName);
@@ -1720,7 +1844,7 @@ app.post('/api/auth/register', async (req, res) => {
       return res.status(409).json({ error: 'Email already registered.' });
     }
 
-    const passwordHash = await bcrypt.hash(password, 10);
+    const passwordHash = await bcrypt.hash(password, 12);
     const fullName = buildFullName(safeFirstName, safeLastName);
     const username = safeEmail;
     const role = 'ITStaff';
@@ -1749,7 +1873,7 @@ app.post('/api/auth/register', async (req, res) => {
 });
 
 // Authenticate a user and create a session
-app.post('/api/auth/login', async (req, res) => {
+app.post('/api/auth/login', authLimiter, async (req, res) => {
   const { email, password } = req.body || {};
   const safeEmail = normalizeEmail(email);
 
@@ -1843,7 +1967,7 @@ app.get('/api/alerts', requireAuth, async (req, res) => {
   try {
     const [rows] = await dbPool.execute(
       `SELECT a.AlertID, a.AlertType, a.Severity, a.Issue, a.Timestamp,
-              a.IsResolved, a.ResolvedAt,
+              a.IsResolved, a.ResolvedAt, a.ResolutionNotes,
               d.DeviceName, d.IPAddress,
               u.FullName AS ResolvedBy
        FROM ALERT a
@@ -1861,7 +1985,8 @@ app.get('/api/alerts', requireAuth, async (req, res) => {
       time: r.Timestamp,
       resolved: Boolean(r.IsResolved),
       resolvedAt: r.ResolvedAt || null,
-      resolvedBy: r.ResolvedBy || null
+      resolvedBy: r.ResolvedBy || null,
+      resolutionNotes: r.ResolutionNotes || null
     })));
   } catch (error) {
     console.error('Alerts load error:', error);
@@ -1869,30 +1994,31 @@ app.get('/api/alerts', requireAuth, async (req, res) => {
   }
 });
 
-// Mark an alert as resolved
+// Mark an alert as resolved with optional maintenance notes
 app.put('/api/alerts/:id/resolve', requireAuth, async (req, res) => {
   const alertId = parseInt(req.params.id, 10);
   if (!Number.isFinite(alertId) || alertId < 1) {
     return res.status(400).json({ error: 'Invalid alert ID.' });
   }
+  const notes = typeof req.body.notes === 'string' ? req.body.notes.trim().slice(0, 2000) : null;
   try {
     const [result] = await dbPool.execute(
-      `UPDATE ALERT SET IsResolved = 1, ResolvedByUserID = ?, ResolvedAt = NOW()
+      `UPDATE ALERT SET IsResolved = 1, ResolvedByUserID = ?, ResolvedAt = NOW(), ResolutionNotes = ?
        WHERE AlertID = ? AND IsResolved = 0`,
-      [req.session.user.userId, alertId]
+      [req.session.user.userId, notes || null, alertId]
     );
     if (result.affectedRows === 0) {
       return res.status(404).json({ error: 'Alert not found or already resolved.' });
     }
     const [rows] = await dbPool.execute(
-      `SELECT a.ResolvedAt, u.FullName AS ResolvedBy
+      `SELECT a.ResolvedAt, a.ResolutionNotes, u.FullName AS ResolvedBy
        FROM ALERT a LEFT JOIN USERS u ON u.UserID = a.ResolvedByUserID
        WHERE a.AlertID = ?`,
       [alertId]
     );
     const r = rows[0];
-    logActivity(req, 'alert_resolved', `AlertID: ${alertId}`);
-    return res.json({ ok: true, resolved: true, resolvedAt: r.ResolvedAt, resolvedBy: r.ResolvedBy });
+    logActivity(req, 'alert_resolved', `AlertID: ${alertId}${notes ? ` — ${notes.slice(0, 80)}` : ''}`);
+    return res.json({ ok: true, resolved: true, resolvedAt: r.ResolvedAt, resolvedBy: r.ResolvedBy, resolutionNotes: r.ResolutionNotes || null });
   } catch (error) {
     console.error('Alert resolve error:', error);
     return res.status(500).json({ error: 'Unable to resolve alert.' });
@@ -2461,6 +2587,341 @@ app.get('/api/analytics/alerts-summary', requireAuth, async (req, res) => {
   }
 });
 
+// AI-powered network insights using Google Gemini
+app.get('/api/analytics/ai-insights', requireAuth, async (req, res) => {
+  const period = parsePeriod(req.query.period);
+  if (!period) return res.status(400).json({ error: 'Invalid period. Use 24h, 7d, or 30d.' });
+
+  if (!process.env.GEMINI_API_KEY) {
+    return res.status(503).json({ error: 'AI insights are not configured. Add GEMINI_API_KEY to server/.env.' });
+  }
+
+  try {
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+
+    // Gather all analytics data in parallel
+    const [
+      [overviewRows],
+      [latencyRows],
+      [uptimeRows],
+      [alertSevRows],
+      [topAlertRows]
+    ] = await Promise.all([
+      dbPool.execute(`
+        SELECT
+          COUNT(DISTINCT DeviceID)                                               AS activeDevices,
+          ROUND(AVG(CASE WHEN Status = 'Online' THEN 1.0 ELSE 0 END) * 100, 1) AS uptimePct,
+          ROUND(AVG(LatencyMs), 1)                                               AS avgLatencyMs
+        FROM DEVICE_LOG
+        WHERE CreatedAt >= NOW() - INTERVAL ? DAY
+      `, [period.days]),
+      dbPool.execute(`
+        SELECT
+          MIN(LatencyMs) AS minMs,
+          MAX(LatencyMs) AS maxMs,
+          ROUND(AVG(LatencyMs), 1) AS avgMs
+        FROM DEVICE_LOG
+        WHERE CreatedAt >= NOW() - INTERVAL ? DAY
+          AND LatencyMs IS NOT NULL
+      `, [period.days]),
+      dbPool.execute(`
+        SELECT d.DeviceName, d.IPAddress,
+          ROUND(AVG(CASE WHEN dl.Status = 'Online' THEN 1.0 ELSE 0 END) * 100, 1) AS uptimePct,
+          ROUND(AVG(dl.LatencyMs), 1) AS avgLatencyMs
+        FROM DEVICE d
+        LEFT JOIN DEVICE_LOG dl ON dl.DeviceID = d.DeviceID
+          AND dl.CreatedAt >= NOW() - INTERVAL ? DAY
+        GROUP BY d.DeviceID, d.DeviceName, d.IPAddress
+        HAVING uptimePct IS NOT NULL AND uptimePct < 90
+        ORDER BY uptimePct ASC
+        LIMIT 5
+      `, [period.days]),
+      dbPool.execute(`
+        SELECT Severity, COUNT(*) AS cnt
+        FROM ALERT
+        WHERE Timestamp >= NOW() - INTERVAL ? DAY
+        GROUP BY Severity
+      `, [period.days]),
+      dbPool.execute(`
+        SELECT d.DeviceName, d.IPAddress, COUNT(*) AS alertCount
+        FROM ALERT a
+        LEFT JOIN DEVICE d ON d.DeviceID = a.DeviceID
+        WHERE a.Timestamp >= NOW() - INTERVAL ? DAY
+        GROUP BY a.DeviceID, d.DeviceName, d.IPAddress
+        ORDER BY alertCount DESC
+        LIMIT 5
+      `, [period.days])
+    ]);
+
+    // Tally alert severity counts
+    const alertCounts = { danger: 0, warning: 0, success: 0 };
+    for (const r of alertSevRows) {
+      const sev = mapSeverityFromDb(r.Severity);
+      if (Object.prototype.hasOwnProperty.call(alertCounts, sev)) alertCounts[sev] += Number(r.cnt);
+    }
+    const totalAlerts = alertCounts.danger + alertCounts.warning + alertCounts.success;
+
+    const ov = overviewRows[0] || {};
+    const lt = latencyRows[0] || {};
+
+    const problemDevText = uptimeRows.length > 0
+      ? uptimeRows.map((d, i) =>
+          `  ${i + 1}. ${d.DeviceName || d.IPAddress || 'Unknown'} (${d.IPAddress || '?'}): uptime ${d.uptimePct ?? '?'}%, avg latency ${d.avgLatencyMs ?? '?'} ms`
+        ).join('\n')
+      : '  None — all devices have ≥90% uptime';
+
+    const topAlertersText = topAlertRows.length > 0
+      ? topAlertRows.map((d, i) =>
+          `  ${i + 1}. ${d.DeviceName || d.IPAddress || 'Unknown'} (${d.IPAddress || '?'}): ${d.alertCount} alerts`
+        ).join('\n')
+      : '  None';
+
+    const prompt = `You are a network operations analyst for a campus network monitoring system.
+Analyze the following telemetry data and provide a concise health assessment.
+
+Period: ${period.label}
+
+Network Summary:
+- Active devices: ${ov.activeDevices ?? 0}
+- Average uptime: ${ov.uptimePct ?? 'N/A'}%
+- Average latency: ${ov.avgLatencyMs ?? 'N/A'} ms
+- Total alerts: ${totalAlerts} (Critical: ${alertCounts.danger}, Warning: ${alertCounts.warning}, Recovery: ${alertCounts.success})
+
+Latency Range:
+- Min: ${lt.minMs ?? 'N/A'} ms, Max: ${lt.maxMs ?? 'N/A'} ms, Avg: ${lt.avgMs ?? 'N/A'} ms
+
+Devices with Uptime Below 90%:
+${problemDevText}
+
+Top Alerting Devices:
+${topAlertersText}
+
+Respond with exactly this structure:
+**Network Health:** [Healthy / Warning / Critical] — one sentence summary
+
+**Key Observations:**
+• [observation 1]
+• [observation 2]
+• [observation 3 if warranted]
+
+**Recommendations:**
+• [action 1]
+• [action 2]
+• [action 3 if warranted]
+
+Keep each bullet under 25 words. Focus on actionable network operations insights.`;
+
+    const result = await model.generateContent(prompt);
+    const insights = result.response.text() || 'Unable to generate insights.';
+
+    return res.json({
+      period: period.label,
+      insights,
+      generatedAt: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('analytics/ai-insights error:', error);
+    const msg = error?.message || 'Unable to generate AI insights.';
+    return res.status(500).json({ error: msg });
+  }
+});
+
+// ── Trend Analytics Endpoints ───────────────────────────────────────────────
+
+// Incident frequency per time bucket + overall MTTR for the period
+app.get('/api/analytics/incident-trend', requireAuth, async (req, res) => {
+  const period = parsePeriod(req.query.period);
+  if (!period) return res.status(400).json({ error: 'Invalid period.' });
+
+  try {
+    const bucketFmt = period.days === 1 ? '%H:00' : '%m/%d';
+
+    const [[buckets], [mttrRows]] = await Promise.all([
+      dbPool.execute(
+        `SELECT
+           DATE_FORMAT(Timestamp, ?)       AS bucket,
+           SUM(AlertType = 'downtime')     AS downtime,
+           SUM(AlertType = 'abnormal')     AS abnormal,
+           SUM(AlertType = 'recovery')     AS recovery,
+           COUNT(*)                        AS total
+         FROM ALERT
+         WHERE Timestamp >= NOW() - INTERVAL ? DAY
+         GROUP BY bucket
+         ORDER BY MIN(Timestamp) ASC`,
+        [bucketFmt, period.days]
+      ),
+      dbPool.execute(
+        `SELECT
+           ROUND(AVG(TIMESTAMPDIFF(MINUTE, Timestamp, ResolvedAt)), 0) AS avgMttrMin,
+           SUM(IsResolved = 1)                                          AS resolvedCount,
+           COUNT(*)                                                      AS totalCount
+         FROM ALERT
+         WHERE Timestamp >= NOW() - INTERVAL ? DAY
+           AND AlertType = 'downtime'`,
+        [period.days]
+      )
+    ]);
+
+    const m = mttrRows[0] || {};
+    return res.json({
+      period: period.label,
+      buckets: buckets.map(r => ({
+        bucket:   r.bucket,
+        downtime: Number(r.downtime) || 0,
+        abnormal: Number(r.abnormal) || 0,
+        recovery: Number(r.recovery) || 0,
+        total:    Number(r.total)    || 0
+      })),
+      mttr: {
+        avgMin:        m.avgMttrMin !== null ? Number(m.avgMttrMin) : null,
+        resolvedCount: Number(m.resolvedCount) || 0,
+        totalCount:    Number(m.totalCount)    || 0
+      }
+    });
+  } catch (error) {
+    console.error('analytics/incident-trend error:', error);
+    return res.status(500).json({ error: 'Unable to load incident trend.' });
+  }
+});
+
+// Incident counts grouped by hour-of-day — reveals peak failure windows
+app.get('/api/analytics/peak-hours', requireAuth, async (req, res) => {
+  const period = parsePeriod(req.query.period);
+  if (!period) return res.status(400).json({ error: 'Invalid period.' });
+
+  try {
+    const [rows] = await dbPool.execute(
+      `SELECT
+         HOUR(Timestamp)             AS hour,
+         COUNT(*)                    AS total,
+         SUM(AlertType = 'downtime') AS downtime,
+         SUM(AlertType = 'abnormal') AS abnormal
+       FROM ALERT
+       WHERE Timestamp >= NOW() - INTERVAL ? DAY
+         AND AlertType IN ('downtime', 'abnormal')
+       GROUP BY hour
+       ORDER BY hour ASC`,
+      [period.days]
+    );
+
+    // Fill all 24 hours so the chart always has a complete x-axis
+    const hourMap = new Map(rows.map(r => [Number(r.hour), r]));
+    const hours = Array.from({ length: 24 }, (_, h) => {
+      const r = hourMap.get(h) || {};
+      return { hour: h, total: Number(r.total) || 0, downtime: Number(r.downtime) || 0, abnormal: Number(r.abnormal) || 0 };
+    });
+
+    return res.json({ period: period.label, hours });
+  } catch (error) {
+    console.error('analytics/peak-hours error:', error);
+    return res.status(500).json({ error: 'Unable to load peak hours.' });
+  }
+});
+
+// Top 10 devices ranked by alert count with per-device MTTR
+app.get('/api/analytics/top-problem-devices', requireAuth, async (req, res) => {
+  const period = parsePeriod(req.query.period);
+  if (!period) return res.status(400).json({ error: 'Invalid period.' });
+
+  try {
+    const [rows] = await dbPool.execute(
+      `SELECT
+         d.DeviceName,
+         d.IPAddress,
+         d.DeviceType,
+         COALESCE(l.BuildingName, 'Unknown') AS building,
+         COALESCE(l.Floor, '')               AS floor,
+         COUNT(a.AlertID)                    AS alertCount,
+         SUM(a.AlertType = 'downtime')       AS downtimeCount,
+         ROUND(AVG(
+           CASE WHEN a.IsResolved = 1 AND a.ResolvedAt IS NOT NULL
+                THEN TIMESTAMPDIFF(MINUTE, a.Timestamp, a.ResolvedAt)
+           END
+         ), 1)                               AS avgResolutionMin
+       FROM ALERT a
+       JOIN DEVICE d ON d.DeviceID = a.DeviceID
+       LEFT JOIN LOCATION l ON l.LocationID = d.LocationID
+       WHERE a.Timestamp >= NOW() - INTERVAL ? DAY
+       GROUP BY d.DeviceID, d.DeviceName, d.IPAddress, d.DeviceType, l.BuildingName, l.Floor
+       ORDER BY alertCount DESC, downtimeCount DESC
+       LIMIT 10`,
+      [period.days]
+    );
+
+    return res.json({
+      period: period.label,
+      devices: rows.map(r => ({
+        name:             r.DeviceName || r.IPAddress || 'Unknown',
+        ip:               r.IPAddress,
+        type:             r.DeviceType || '',
+        building:         r.building,
+        floor:            r.floor,
+        alertCount:       Number(r.alertCount)      || 0,
+        downtimeCount:    Number(r.downtimeCount)   || 0,
+        avgResolutionMin: r.avgResolutionMin !== null ? Number(r.avgResolutionMin) : null
+      }))
+    });
+  } catch (error) {
+    console.error('analytics/top-problem-devices error:', error);
+    return res.status(500).json({ error: 'Unable to load top problem devices.' });
+  }
+});
+
+// Uptime percentage and downtime alert count grouped by building
+app.get('/api/analytics/location-health', requireAuth, async (req, res) => {
+  const period = parsePeriod(req.query.period);
+  if (!period) return res.status(400).json({ error: 'Invalid period.' });
+
+  try {
+    const [[uptimeRows], [alertRows]] = await Promise.all([
+      dbPool.execute(
+        `SELECT
+           COALESCE(l.BuildingName, 'Unknown') AS building,
+           COUNT(DISTINCT d.DeviceID)          AS deviceCount,
+           ROUND(
+             SUM(CASE WHEN dl.Status = 'Online' THEN 1 ELSE 0 END) /
+             NULLIF(COUNT(dl.LogID), 0) * 100
+           , 1)                                AS uptimePct
+         FROM DEVICE d
+         LEFT JOIN LOCATION l ON l.LocationID = d.LocationID
+         JOIN DEVICE_LOG dl ON dl.DeviceID = d.DeviceID
+           AND dl.CreatedAt >= NOW() - INTERVAL ? DAY
+         GROUP BY COALESCE(l.BuildingName, 'Unknown')
+         ORDER BY uptimePct ASC`,
+        [period.days]
+      ),
+      dbPool.execute(
+        `SELECT
+           COALESCE(l.BuildingName, 'Unknown') AS building,
+           COUNT(*)                            AS alertCount
+         FROM ALERT a
+         JOIN DEVICE d ON d.DeviceID = a.DeviceID
+         LEFT JOIN LOCATION l ON l.LocationID = d.LocationID
+         WHERE a.Timestamp >= NOW() - INTERVAL ? DAY
+           AND a.AlertType = 'downtime'
+         GROUP BY COALESCE(l.BuildingName, 'Unknown')`,
+        [period.days]
+      )
+    ]);
+
+    const alertMap = new Map(alertRows.map(r => [r.building, Number(r.alertCount)]));
+
+    return res.json({
+      period: period.label,
+      locations: uptimeRows.map(r => ({
+        building:    r.building,
+        deviceCount: Number(r.deviceCount) || 0,
+        uptimePct:   r.uptimePct !== null ? Number(r.uptimePct) : null,
+        alertCount:  alertMap.get(r.building) || 0
+      }))
+    });
+  } catch (error) {
+    console.error('analytics/location-health error:', error);
+    return res.status(500).json({ error: 'Unable to load location health.' });
+  }
+});
+
 // Update the authenticated user's profile
 app.put('/api/auth/profile', requireAuth, async (req, res) => {
   const { firstName, lastName, contactNumber } = req.body || {};
@@ -2685,6 +3146,36 @@ async function runMigrations() {
     console.log('Migration: activity_logs table ensured.');
   } catch (err) {
     console.error('Migration error (activity_logs):', err.message);
+  }
+
+  // Step 8: Add ResolutionNotes column to ALERT for maintenance feedback
+  try {
+    await dbPool.execute('ALTER TABLE ALERT ADD COLUMN ResolutionNotes TEXT NULL');
+    console.log('Migration: ResolutionNotes column added to ALERT.');
+  } catch (err) {
+    if (err.code === 'ER_DUP_FIELDNAME') {
+      console.log('Migration: ResolutionNotes column already exists, skipping.');
+    } else {
+      console.error('Migration error (ResolutionNotes):', err.message);
+    }
+  }
+
+  // Step 7: Add performance indexes for analytics time-range queries
+  const perfIndexes = [
+    { sql: 'CREATE INDEX idx_device_log_created ON DEVICE_LOG(CreatedAt)', name: 'idx_device_log_created' },
+    { sql: 'CREATE INDEX idx_alert_timestamp ON ALERT(Timestamp)', name: 'idx_alert_timestamp' },
+  ];
+  for (const { sql, name } of perfIndexes) {
+    try {
+      await dbPool.execute(sql);
+      console.log(`Migration: index ${name} created.`);
+    } catch (err) {
+      if (err.code === 'ER_DUP_KEYNAME') {
+        console.log(`Migration: index ${name} already exists, skipping.`);
+      } else {
+        console.error(`Migration error (${name}):`, err.message);
+      }
+    }
   }
 }
 

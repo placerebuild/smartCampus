@@ -1,4 +1,4 @@
-const ACTIVITY_API_BASE = window.MONITOR_API_BASE || `http://${window.location.hostname || 'localhost'}:4000`;
+const ACTIVITY_API_BASE = window.MONITOR_API_BASE || window.location.origin;
 const PAGE_SIZE = 50;
 
 let currentOffset = 0;

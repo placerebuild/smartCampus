@@ -542,6 +542,54 @@ code {
     }
 }
 
+/* Uptime Bar Chart — scrollable container for large device counts */
+#uptimeBarChart {
+    display: block;
+    width: 100% !important;
+}
+
+/* AI Insights Panel */
+#ai-insights-card .section-title {
+    margin-bottom: 0;
+}
+
+.ai-insights-body {
+    font-size: 0.925rem;
+    line-height: 1.7;
+    color: var(--text-900);
+    border-top: 1px solid var(--border-soft);
+    padding-top: 1rem;
+}
+
+.ai-insights-body strong {
+    color: #0e2d48;
+}
+
+.ai-insights-body ul {
+    list-style: none;
+    padding-left: 0;
+    margin-bottom: 0.75rem;
+}
+
+.ai-insights-body ul li {
+    position: relative;
+    padding-left: 1.4rem;
+    margin-bottom: 0.35rem;
+    color: var(--text-700);
+}
+
+.ai-insights-body ul li::before {
+    content: '→';
+    position: absolute;
+    left: 0;
+    color: var(--accent-blue);
+    font-weight: 700;
+}
+
+.ai-insights-body p {
+    margin-bottom: 0.6rem;
+}
+
 @media (max-width: 575.98px) {
     .search-wrap,
     .status-pill {

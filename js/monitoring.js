@@ -1,5 +1,4 @@
-const monitorHost = window.location.hostname || 'localhost';
-const MONITOR_API_BASE = window.MONITOR_API_BASE || `http://${monitorHost}:4000`;
+const MONITOR_API_BASE = window.MONITOR_API_BASE || window.location.origin;
 const ROUTER_IP = window.ROUTER_IP || '';
 const ROUTER_LABEL = window.ROUTER_LABEL || 'Router';
 const ROUTER_TYPE = window.ROUTER_TYPE || 'Modem/Router';
@@ -168,9 +167,6 @@ async function runMonitorCycle() {
     monitorInFlight = true;
 
     try {
-        const snapshot = await fetchRouterSnapshot();
-        if (!snapshot) return;
-
         let devices = null;
         try {
             devices = await fetchDeviceList();
@@ -178,14 +174,19 @@ async function runMonitorCycle() {
             console.warn('Device list load failed:', error.message || error);
         }
 
+        let snapshot = null;
+        try {
+            snapshot = await fetchRouterSnapshot();
+        } catch (error) {
+            console.warn('Router monitor failed:', error.message || error);
+        }
+
         if (Array.isArray(devices) && devices.length > 0) {
             updateUiFromDevices(devices);
-        } else {
+        } else if (snapshot) {
             updateDeviceTable(snapshot);
             updateDashboard(snapshot);
         }
-    } catch (error) {
-        console.warn('Router monitor failed:', error.message || error);
     } finally {
         monitorInFlight = false;
     }

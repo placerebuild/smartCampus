@@ -34,8 +34,8 @@
                 <div class="col-12 col-md-3">
                     <label for="topology-view-mode" class="form-label mb-1">View Mode</label>
                     <select id="topology-view-mode" class="form-select">
-                        <option value="logical" selected>Topology Map (Logical)</option>
-                        <option value="hierarchy">Hierarchy View</option>
+                        <option value="buildings" selected>Buildings View</option>
+                        <option value="logical">Topology Map</option>
                         <option value="floor">Floor-based Map</option>
                         <option value="realtime">Real-time Map</option>
                     </select>
@@ -55,12 +55,17 @@
                         <option value="Warning">Warning</option>
                     </select>
                 </div>
-                <div class="col-12 col-md-3 d-grid" id="floor-selector-group" style="display:none">
-                    <label class="form-label mb-1">Floor</label>
-                    <div class="btn-group w-100" role="group">
-                        <button type="button" class="btn btn-outline-secondary active" id="floor-btn-1" onclick="switchFloor(1)">1st Floor</button>
-                        <button type="button" class="btn btn-outline-secondary" id="floor-btn-2" onclick="switchFloor(2)">2nd Floor</button>
-                    </div>
+                <div class="col-12 col-md-3" id="device-type-filter-col">
+                    <label for="device-type-filter" class="form-label mb-1">Device Type</label>
+                    <select id="device-type-filter" class="form-select">
+                        <option value="all">All Devices</option>
+                        <option value="router">Modem/Router</option>
+                        <option value="phone">Phone</option>
+                        <option value="pc">PC</option>
+                        <option value="switch">Switches</option>
+                        <option value="ap">WiFi AP</option>
+                        <option value="unknown">Unknown</option>
+                    </select>
                 </div>
                 <div class="col-12 col-md-3 d-grid" id="reset-btn-col">
                     <button id="reset-topology-btn" class="btn btn-outline-primary">Reset Map View</button>
@@ -69,14 +74,80 @@
         </div>
 
         <div class="row g-3">
-            <div class="col-12 col-xl-8">
+            <div class="col-12 col-xl-8" id="topology-map-col">
                 <div class="topology-map-shell">
                     <div id="network" class="topology-container" aria-label="Campus topology map"></div>
-                    <div id="floor-map-container" style="display:none; position:absolute; inset:0; overflow:hidden;">
-                        <img id="floor-map-img" src="../images/1stFloor.jpg" alt="Floor Plan"
-                             draggable="false"
-                             style="width:100%; height:100%; object-fit:contain; display:block; pointer-events:none; user-select:none;">
+                    <div id="floor-map-container" style="display:none; position:absolute; inset:0; overflow:auto; background:#e8ecf0;">
+
+                        <!-- Step 1: Building picker -->
+                        <div id="building-picker" style="padding:28px 24px; box-sizing:border-box;">
+                            <p style="font-family:'Sora',sans-serif; font-weight:700; font-size:15px; color:#0f2338; margin-bottom:18px;">Select a Building to view its floor plan</p>
+                            <div id="building-picker-cards" style="display:flex; flex-wrap:wrap; gap:18px;"></div>
+                        </div>
+
+                        <!-- Step 2: Floor plan for selected building -->
+                        <div id="floor-plan-view" style="display:none; flex-direction:column; height:100%; box-sizing:border-box;">
+                            <div style="padding:8px 14px; background:#1a3a6e; color:white; display:flex; align-items:center; gap:12px; flex-shrink:0;">
+                                <button onclick="showBuildingPicker()" style="background:none; border:1px solid rgba(255,255,255,0.55); color:white; border-radius:5px; padding:4px 12px; cursor:pointer; font-size:12px; font-family:inherit;">&#8592; Back</button>
+                                <span id="floor-plan-building-name" style="font-weight:700; font-family:'Sora',sans-serif; font-size:13px;"></span>
+                                <!-- Live Devices toggle -->
+                                <button id="floor-dots-toggle" onclick="toggleFloorDots()"
+                                        style="margin-left:auto; display:flex; align-items:center; gap:8px; background:rgba(255,255,255,0.12); border:1px solid rgba(255,255,255,0.35); color:white; border-radius:6px; padding:4px 12px; cursor:pointer; font-size:12px; font-weight:600; font-family:inherit; white-space:nowrap; transition:background 0.2s;">
+                                    <span id="floor-dots-knob" style="display:inline-block; width:10px; height:10px; border-radius:50%; background:#aaa; transition:background 0.2s; flex-shrink:0;"></span>
+                                    Live Devices
+                                </button>
+                            </div>
+                            <div style="display:flex; gap:12px; padding:12px; flex:1; box-sizing:border-box; min-height:0;">
+                                <div style="flex:1; display:flex; flex-direction:column; background:white; border-radius:8px; overflow:hidden; box-shadow:0 2px 8px rgba(0,0,0,0.12); min-width:0;">
+                                    <div id="floor-map-1" style="flex:1; position:relative; overflow:hidden;">
+                                        <img src="../images/1stFloor.svg" alt="Ground Floor" draggable="false"
+                                             style="width:100%; height:100%; object-fit:contain; display:block; pointer-events:none; user-select:none;">
+                                        <div id="floor-dot-overlay-1" style="position:absolute; inset:0; pointer-events:none; display:none;"></div>
+                                    </div>
+                                    <div style="text-align:center; padding:8px 0; background:#1a3a6e; color:white; font-weight:700; font-size:13px; letter-spacing:0.5px;">1ST FLOOR</div>
+                                </div>
+                                <div style="flex:1; display:flex; flex-direction:column; background:white; border-radius:8px; overflow:hidden; box-shadow:0 2px 8px rgba(0,0,0,0.12); min-width:0;">
+                                    <div id="floor-map-2" style="flex:1; position:relative; overflow:hidden;">
+                                        <img src="../images/2ndFloor.svg" alt="2nd Floor" draggable="false"
+                                             style="width:100%; height:100%; object-fit:contain; display:block; pointer-events:none; user-select:none;">
+                                        <div id="floor-dot-overlay-2" style="position:absolute; inset:0; pointer-events:none; display:none;"></div>
+                                    </div>
+                                    <div style="text-align:center; padding:8px 0; background:#1a3a6e; color:white; font-weight:700; font-size:13px; letter-spacing:0.5px;">2ND FLOOR</div>
+                                </div>
+                            </div>
+                        </div>
+
                     </div>
+                    <!-- Real-time floor map overlay -->
+                    <div id="realtime-floor-container" style="display:none; position:absolute; inset:0; overflow:auto; background:#e8ecf0; padding:14px; box-sizing:border-box;">
+                        <div style="display:flex; flex-direction:column; gap:14px; min-height:100%;">
+                            <!-- Floor 1 -->
+                            <div style="flex:1; display:flex; flex-direction:column; background:white; border-radius:10px; overflow:hidden; box-shadow:0 2px 10px rgba(0,0,0,0.12); min-height:220px;">
+                                <div id="realtime-floor-1-wrap" style="flex:1; position:relative; overflow:hidden;">
+                                    <img src="../images/1stFloor.svg" id="rt-img-1" alt="Ground Floor" draggable="false"
+                                         style="width:100%; height:100%; object-fit:contain; display:block; pointer-events:none; user-select:none;">
+                                    <div id="realtime-overlay-1" style="position:absolute; inset:0; pointer-events:none;"></div>
+                                </div>
+                                <div style="text-align:center; padding:7px 0; background:#1a3a6e; color:white; font-weight:700; font-size:12px; letter-spacing:0.5px; flex-shrink:0;">1ST FLOOR</div>
+                            </div>
+                            <!-- Floor 2 -->
+                            <div style="flex:1; display:flex; flex-direction:column; background:white; border-radius:10px; overflow:hidden; box-shadow:0 2px 10px rgba(0,0,0,0.12); min-height:220px;">
+                                <div id="realtime-floor-2-wrap" style="flex:1; position:relative; overflow:hidden;">
+                                    <img src="../images/2ndFloor.svg" id="rt-img-2" alt="2nd Floor" draggable="false"
+                                         style="width:100%; height:100%; object-fit:contain; display:block; pointer-events:none; user-select:none;">
+                                    <div id="realtime-overlay-2" style="position:absolute; inset:0; pointer-events:none;"></div>
+                                </div>
+                                <div style="text-align:center; padding:7px 0; background:#1a3a6e; color:white; font-weight:700; font-size:12px; letter-spacing:0.5px; flex-shrink:0;">2ND FLOOR</div>
+                            </div>
+                        </div>
+                        <!-- Legend -->
+                        <div style="display:flex; gap:18px; justify-content:center; padding:10px 0 2px; font-size:12px; font-family:'IBM Plex Sans',sans-serif; color:#444;">
+                            <span><span style="display:inline-block;width:11px;height:11px;border-radius:50%;background:#22c55e;vertical-align:middle;margin-right:5px;"></span>Online</span>
+                            <span><span style="display:inline-block;width:11px;height:11px;border-radius:50%;background:#ef4444;vertical-align:middle;margin-right:5px;"></span>Offline</span>
+                            <span><span style="display:inline-block;width:11px;height:11px;border-radius:50%;background:#f59e0b;vertical-align:middle;margin-right:5px;"></span>Warning</span>
+                        </div>
+                    </div>
+
                     <div id="topology-empty-state" class="topology-empty-state active">
                         <span class="empty-icon"><i class="fas fa-project-diagram"></i></span>
                         <h6 class="mb-1">Awaiting topology data</h6>
@@ -89,7 +160,7 @@
                     <span class="legend-item"><span class="legend-dot offline"></span> Offline</span>
                 </div>
             </div>
-            <div class="col-12 col-xl-4">
+            <div class="col-12 col-xl-4" id="topology-detail-col">
                 <div class="card panel-card p-3 topology-detail-card">
                     <h6 class="section-title mb-2">Device Details</h6>
                     <p class="text-muted mb-3">Select a device on the map to inspect its metadata and links.</p>

@@ -1,6 +1,13 @@
 let devicesData = [];
 
-
+function escapeHtml(str) {
+    return String(str == null ? '' : str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#x27;');
+}
 
 function upsertDevice(device) {
     const index = devicesData.findIndex(item => item.ip === device.ip);
@@ -112,16 +119,16 @@ function populateDevicesTable() {
         const locationLabel = resolveLocationLabel(dev);
 
         tbody.innerHTML += `
-            <tr data-device-row="${deviceKey}">
-                <td><strong>${formatDeviceValue(dev.name || dev.ip || 'Device', 'Device')}</strong></td>
-                <td>${formatDeviceValue(dev.type)}</td>
-                <td><code>${formatDeviceValue(dev.ip)}</code></td>
+            <tr data-device-row="${escapeHtml(deviceKey)}">
+                <td><strong>${escapeHtml(formatDeviceValue(dev.name || dev.ip || 'Device', 'Device'))}</strong></td>
+                <td>${escapeHtml(formatDeviceValue(dev.type))}</td>
+                <td><code>${escapeHtml(formatDeviceValue(dev.ip))}</code></td>
                 <td>${macCell}</td>
-                <td>${formatDeviceValue(locationLabel)}</td>
+                <td>${escapeHtml(formatDeviceValue(locationLabel))}</td>
                 <td data-status-cell>${statusHTML}</td>
-                <td data-last-seen-cell>${formatDeviceValue(dev.lastSeen)}</td>
+                <td data-last-seen-cell>${escapeHtml(formatDeviceValue(dev.lastSeen))}</td>
                 <td>
-                    <button class="btn btn-sm btn-outline-primary" data-device-action="view" data-device-key="${deviceKey}">View</button>
+                    <button class="btn btn-sm btn-outline-primary" data-device-action="view" data-device-key="${escapeHtml(deviceKey)}">View</button>
                 </td>
             </tr>`;
     });
@@ -132,22 +139,22 @@ function openDeviceDetailsModal(device) {
     if (existing) existing.remove();
 
     const selected = device || {};
-    const name = formatDeviceValue(selected.name || selected.ip || 'Device', 'Device');
-    const type = formatDeviceValue(selected.type);
-    const ip = formatDeviceValue(selected.ip);
-    const mac = formatDeviceValue(selected.mac);
-    const location = formatDeviceValue(resolveLocationLabel(selected));
-    const building = formatDeviceValue(selected.building);
-    const floor = formatDeviceValue(selected.floor);
-    const room = formatDeviceValue(selected.room);
+    const name = escapeHtml(formatDeviceValue(selected.name || selected.ip || 'Device', 'Device'));
+    const type = escapeHtml(formatDeviceValue(selected.type));
+    const ip = escapeHtml(formatDeviceValue(selected.ip));
+    const mac = escapeHtml(formatDeviceValue(selected.mac));
+    const location = escapeHtml(formatDeviceValue(resolveLocationLabel(selected)));
+    const building = escapeHtml(formatDeviceValue(selected.building));
+    const floor = escapeHtml(formatDeviceValue(selected.floor));
+    const room = escapeHtml(formatDeviceValue(selected.room));
     const statusMarkup = buildStatusMarkup(selected.status);
-    const lastSeen = formatDeviceValue(selected.lastSeen);
-    const description = formatDeviceValue(selected.description, '');
-    const nameInput = selected.name ? String(selected.name) : '';
-    const typeInput = selected.type ? String(selected.type) : '';
-    const buildingInput = selected.building ? String(selected.building) : '';
-    const floorInput = selected.floor ? String(selected.floor) : '';
-    const roomInput = selected.room ? String(selected.room) : '';
+    const lastSeen = escapeHtml(formatDeviceValue(selected.lastSeen));
+    const description = escapeHtml(formatDeviceValue(selected.description, ''));
+    const nameInput = escapeHtml(selected.name ? String(selected.name) : '');
+    const typeInput = escapeHtml(selected.type ? String(selected.type) : '');
+    const buildingInput = escapeHtml(selected.building ? String(selected.building) : '');
+    const floorInput = escapeHtml(selected.floor ? String(selected.floor) : '');
+    const roomInput = escapeHtml(selected.room ? String(selected.room) : '');
     const canEditLocation = Boolean(selected && selected.id);
 
     const packetLoss = formatMetricValue(resolveDeviceMetric(selected, [
@@ -680,6 +687,19 @@ let alertsData = [];
 function setDevicesData(devices) {
     devicesData = Array.isArray(devices) ? devices : [];
     populateDevicesTable();
+
+    const onlineCount  = devicesData.filter(d => d.status === 'Online').length;
+    const offlineCount = devicesData.filter(d => d.status === 'Offline').length;
+    const unknownCount = Math.max(0, devicesData.length - onlineCount - offlineCount);
+    if (typeof window.createStatusChart === 'function') {
+        window.createStatusChart(onlineCount, offlineCount, unknownCount);
+    }
+    const totalEl   = document.getElementById('total-devices');
+    const onlineEl  = document.getElementById('online-count');
+    const offlineEl = document.getElementById('offline-count');
+    if (totalEl)  totalEl.textContent  = devicesData.length;
+    if (onlineEl) onlineEl.textContent = onlineCount;
+    if (offlineEl) offlineEl.textContent = offlineCount;
 }
 
 function setAlertsData(alerts) {
@@ -713,49 +733,97 @@ async function populateAlertsTable() {
         const label = a.severity === 'danger' ? 'High' : a.severity === 'warning' ? 'Warning' : 'Info';
         const badgeClass = a.severity === 'danger' ? 'danger' : a.severity === 'warning' ? 'warning' : 'success';
         const statusBadge = a.resolved
-            ? `<span class="badge bg-success">Resolved</span>${a.resolvedBy ? `<br><small class="text-muted">${a.resolvedBy}</small>` : ''}`
+            ? `<span class="badge bg-success">Resolved</span>`
             : '<span class="badge bg-secondary">Open</span>';
+        const notesCell = a.resolutionNotes
+            ? `<button class="btn btn-sm btn-outline-secondary" onclick="viewResolutionNotes(${a.id})"><i class="fas fa-eye me-1"></i>View</button>`
+            : `<span class="text-muted small">—</span>`;
         const actionBtn = a.resolved
             ? ''
-            : `<button class="btn btn-sm btn-outline-success" onclick="resolveAlert(${a.id}, this)"><i class="fas fa-check me-1"></i>Resolve</button>`;
+            : `<button class="btn btn-sm btn-outline-success" onclick="openResolveModal(${a.id}, '${escapeHtml(a.device)}', '${escapeHtml(a.issue)}')"><i class="fas fa-check me-1"></i>Resolve</button>`;
         return `<tr data-alert-id="${a.id}">
             <td>${new Date(a.time).toLocaleString()}</td>
-            <td>${a.device}</td>
-            <td>${a.issue}</td>
+            <td>${escapeHtml(a.device)}</td>
+            <td>${escapeHtml(a.issue)}</td>
             <td><span class="badge bg-${badgeClass}">${label}</span></td>
             <td>${statusBadge}</td>
+            <td>${notesCell}</td>
             <td>${actionBtn}</td>
         </tr>`;
     }).join('');
 }
 
-async function resolveAlert(alertId, btn) {
-    btn.disabled = true;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+// State for the resolve modal
+let _resolveTargetId = null;
+let _resolveTargetBtn = null;
+
+function openResolveModal(alertId, deviceName, issue) {
+    _resolveTargetId = alertId;
+    const infoEl = document.getElementById('resolve-modal-device-info');
+    const notesEl = document.getElementById('resolution-notes-input');
+    const countEl = document.getElementById('notes-char-count');
+    const confirmBtn = document.getElementById('confirm-resolve-btn');
+    if (infoEl) infoEl.textContent = `${deviceName} — ${issue}`;
+    if (notesEl) { notesEl.value = ''; }
+    if (countEl) countEl.textContent = '0';
+    if (notesEl && countEl) {
+        notesEl.oninput = () => { countEl.textContent = notesEl.value.length; };
+    }
+    if (confirmBtn) {
+        confirmBtn.onclick = () => submitResolve();
+    }
+    const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('resolveAlertModal'));
+    modal.show();
+}
+
+async function submitResolve() {
+    const alertId = _resolveTargetId;
+    if (!alertId) return;
+    const notes = (document.getElementById('resolution-notes-input')?.value || '').trim();
+    const confirmBtn = document.getElementById('confirm-resolve-btn');
+    if (confirmBtn) { confirmBtn.disabled = true; confirmBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Saving…'; }
     try {
         const res = await fetch(getTopologyApiBase() + `/api/alerts/${alertId}/resolve`, {
             method: 'PUT',
-            credentials: 'include'
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ notes })
         });
         if (!res.ok) throw new Error('Server error');
         const data = await res.json();
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('resolveAlertModal')).hide();
         const row = document.querySelector(`tr[data-alert-id="${alertId}"]`);
         if (row) {
-            row.cells[4].innerHTML = `<span class="badge bg-success">Resolved</span>${data.resolvedBy ? `<br><small class="text-muted">${data.resolvedBy}</small>` : ''}`;
-            row.cells[5].innerHTML = '';
+            row.cells[4].innerHTML = `<span class="badge bg-success">Resolved</span>`;
+            row.cells[5].innerHTML = data.resolutionNotes
+                ? `<button class="btn btn-sm btn-outline-secondary" onclick="viewResolutionNotes(${alertId})"><i class="fas fa-eye me-1"></i>View</button>`
+                : `<span class="text-muted small">—</span>`;
+            row.cells[6].innerHTML = '';
             const entry = alertsData.find(item => item.id === alertId);
-            if (entry) { entry.resolved = true; entry.resolvedAt = data.resolvedAt; entry.resolvedBy = data.resolvedBy; }
+            if (entry) { entry.resolved = true; entry.resolvedAt = data.resolvedAt; entry.resolvedBy = data.resolvedBy; entry.resolutionNotes = data.resolutionNotes; }
         }
     } catch (e) {
-        btn.disabled = false;
-        btn.innerHTML = '<i class="fas fa-check me-1"></i>Resolve';
         console.error('Failed to resolve alert:', e);
+        if (confirmBtn) { confirmBtn.disabled = false; confirmBtn.innerHTML = '<i class="fas fa-check me-1"></i>Mark as Resolved'; }
+    } finally {
+        _resolveTargetId = null;
     }
+}
+
+function viewResolutionNotes(alertId) {
+    const entry = alertsData.find(a => a.id === alertId);
+    if (!entry) return;
+    const modal = document.getElementById('viewNotesModal');
+    if (!modal) return;
+    modal.querySelector('#view-notes-device').textContent = `${entry.device} — ${entry.issue}`;
+    modal.querySelector('#view-notes-resolver').textContent = entry.resolvedBy || 'Unknown';
+    modal.querySelector('#view-notes-body').textContent = entry.resolutionNotes || '';
+    bootstrap.Modal.getOrCreateInstance(modal).show();
 }
 
 function exportAlertsCSV() {
     if (!alertsData.length) return;
-    const headers = ['ID', 'Timestamp', 'Device', 'Issue', 'Severity', 'Status', 'Resolved At', 'Resolved By'];
+    const headers = ['ID', 'Timestamp', 'Device', 'Issue', 'Severity', 'Status', 'Resolved At', 'Resolved By', 'Resolution Notes'];
     const csvRows = alertsData.map(a => [
         a.id,
         new Date(a.time).toLocaleString(),
@@ -764,7 +832,8 @@ function exportAlertsCSV() {
         a.severity === 'danger' ? 'High' : a.severity === 'warning' ? 'Warning' : 'Info',
         a.resolved ? 'Resolved' : 'Open',
         a.resolvedAt ? new Date(a.resolvedAt).toLocaleString() : '',
-        a.resolvedBy || ''
+        a.resolvedBy || '',
+        a.resolutionNotes || ''
     ]);
     const csv = [headers, ...csvRows].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
@@ -802,7 +871,7 @@ let topologyNetwork = null;
 let topologyNodes = null;
 let topologyEdges = null;
 let topologySelectedId = null;
-let topologyViewMode = 'logical';
+let topologyViewMode = 'buildings';
 let topologyTrafficTimer = null;
 let topologyPollTimer = null;
 let topologySocket = null;
@@ -814,8 +883,7 @@ let campusDevices = [];
 let campusLinks = [];
 
 function getTopologyApiBase() {
-    const host = window.location.hostname || 'localhost';
-    return window.TOPOLOGY_API_BASE || window.MONITOR_API_BASE || `http://${host}:4000`;
+    return window.TOPOLOGY_API_BASE || window.MONITOR_API_BASE || window.location.origin;
 }
 
 const TOPOLOGY_POLL_INTERVAL_MS = Number(window.TOPOLOGY_POLL_INTERVAL_MS || 15000);
@@ -879,14 +947,22 @@ function getTopologyIcon(type) {
         return topologyIconCache.get(key);
     }
 
-    const routerSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><circle cx="32" cy="32" r="22" fill="#f2f7ff" stroke="#0f2338" stroke-width="3"/><path d="M32 14v10M32 40v10M14 32h10M40 32h10" stroke="#0f2338" stroke-width="3" stroke-linecap="round"/><circle cx="32" cy="32" r="4" fill="#0f2338"/></svg>';
-    const switchSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect x="8" y="18" width="48" height="28" rx="6" fill="#f2f7ff" stroke="#0f2338" stroke-width="3"/><circle cx="20" cy="32" r="2" fill="#0f2338"/><circle cx="28" cy="32" r="2" fill="#0f2338"/><circle cx="36" cy="32" r="2" fill="#0f2338"/><circle cx="44" cy="32" r="2" fill="#0f2338"/></svg>';
-    const serverSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect x="18" y="10" width="28" height="44" rx="4" fill="#f2f7ff" stroke="#0f2338" stroke-width="3"/><rect x="24" y="22" width="16" height="2" fill="#0f2338"/><rect x="24" y="30" width="16" height="2" fill="#0f2338"/><rect x="24" y="38" width="16" height="2" fill="#0f2338"/><circle cx="32" cy="46" r="2" fill="#0f2338"/></svg>';
-    const pcSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect x="12" y="14" width="40" height="26" rx="4" fill="#f2f7ff" stroke="#0f2338" stroke-width="3"/><rect x="24" y="42" width="16" height="4" fill="#0f2338"/><rect x="20" y="48" width="24" height="4" fill="#0f2338"/></svg>';
-    const apSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><circle cx="32" cy="34" r="6" fill="#0f2338"/><path d="M20 26c7-7 17-7 24 0" stroke="#0f2338" stroke-width="3" stroke-linecap="round" fill="none"/><path d="M24 30c4-4 12-4 16 0" stroke="#0f2338" stroke-width="3" stroke-linecap="round" fill="none"/></svg>';
+    // Router: WiFi router with 3 antennas, dark body, ethernet ports (matches reference image 1)
+    const routerSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80"><ellipse cx="44" cy="75" rx="26" ry="4" fill="#1a1a1a" opacity="0.25"/><line x1="24" y1="48" x2="21" y2="10" stroke="#111" stroke-width="4.5" stroke-linecap="round"/><circle cx="21" cy="8" r="4.5" fill="#111"/><line x1="40" y1="48" x2="40" y2="6" stroke="#111" stroke-width="4.5" stroke-linecap="round"/><circle cx="40" cy="4" r="4.5" fill="#111"/><line x1="56" y1="48" x2="59" y2="10" stroke="#111" stroke-width="4.5" stroke-linecap="round"/><circle cx="59" cy="8" r="4.5" fill="#111"/><rect x="6" y="48" width="68" height="22" rx="5" fill="#2e2e2e"/><rect x="8" y="50" width="64" height="7" rx="3" fill="#3c3c3c"/><rect x="8" y="57" width="64" height="11" rx="0" fill="#2a2a2a"/><circle cx="16" cy="60" r="5" fill="#1a1a1a" stroke="#555" stroke-width="1.5"/><circle cx="64" cy="60" r="5" fill="#1a1a1a" stroke="#555" stroke-width="1.5"/><rect x="26" y="57" width="5" height="6" rx="1" fill="#666"/><rect x="33" y="57" width="5" height="6" rx="1" fill="#666"/><rect x="40" y="57" width="5" height="6" rx="1" fill="#666"/><rect x="47" y="57" width="5" height="6" rx="1" fill="#666"/></svg>';
+    // Switch: silver isometric rack switch with port grid + green LEDs (matches reference image 3)
+    const switchSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 90 52"><defs><linearGradient id="stg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#e2e6f0"/><stop offset="100%" stop-color="#b8bece"/></linearGradient><linearGradient id="sfg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#c8ccd8"/><stop offset="100%" stop-color="#a0a4b0"/></linearGradient></defs><polygon points="5,6 85,6 85,34 5,34" fill="url(#stg)" stroke="#909090" stroke-width="1"/><rect x="5" y="34" width="80" height="12" rx="0" fill="url(#sfg)" stroke="#909090" stroke-width="1"/><polygon points="85,6 90,11 90,39 85,34" fill="#909898" stroke="#808888" stroke-width="1"/><rect x="5" y="6" width="80" height="5" rx="0" fill="#eef0f8"/><rect x="8" y="37" width="5" height="5" rx="0.5" fill="#333"/><rect x="15" y="37" width="5" height="5" rx="0.5" fill="#333"/><rect x="22" y="37" width="5" height="5" rx="0.5" fill="#333"/><rect x="29" y="37" width="5" height="5" rx="0.5" fill="#333"/><rect x="36" y="37" width="5" height="5" rx="0.5" fill="#333"/><rect x="43" y="37" width="5" height="5" rx="0.5" fill="#333"/><rect x="52" y="38" width="5" height="3" rx="0.5" fill="#00dd00"/><rect x="59" y="38" width="5" height="3" rx="0.5" fill="#00dd00"/><rect x="66" y="38" width="5" height="3" rx="0.5" fill="#00dd00"/><rect x="73" y="38" width="5" height="3" rx="0.5" fill="#00dd00"/><rect x="80" y="38" width="3" height="3" rx="0.5" fill="#eecc00"/></svg>';
+    // Server: dark navy tower PC/server with 2 drive bays + circular power button (matches reference image 2)
+    const serverSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 80"><rect x="4" y="2" width="44" height="76" rx="5" fill="#2d3f5c"/><rect x="4" y="2" width="44" height="76" rx="5" fill="none" stroke="#1a2a40" stroke-width="1.5"/><rect x="10" y="10" width="32" height="16" rx="2" fill="#1c2e44"/><rect x="12" y="12" width="28" height="12" rx="1.5" fill="#243654" stroke="#3a5878" stroke-width="1"/><rect x="10" y="30" width="32" height="9" rx="2" fill="#1c2e44" stroke="#3a5878" stroke-width="1"/><circle cx="26" cy="55" r="10" fill="#1c2e44" stroke="white" stroke-width="2.5"/><circle cx="26" cy="55" r="5" fill="#1c2e44" stroke="white" stroke-width="1.5"/><rect x="10" y="68" width="32" height="6" rx="2" fill="#1c2e44" stroke="#3a5878" stroke-width="1"/></svg>';
+    // PC: tower + widescreen monitor (matches reference image 4)
+    const pcSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 64"><rect x="2" y="14" width="20" height="46" rx="3" fill="#111"/><rect x="5" y="20" width="14" height="6" rx="1" fill="#222" stroke="#444" stroke-width="1"/><rect x="5" y="29" width="14" height="4" rx="1" fill="#222" stroke="#444" stroke-width="1"/><circle cx="12" cy="50" r="2.5" fill="#222" stroke="#444" stroke-width="1"/><rect x="26" y="6" width="50" height="38" rx="6" fill="#111"/><rect x="30" y="10" width="42" height="30" rx="3" fill="white"/><rect x="44" y="44" width="14" height="6" rx="1" fill="#111"/><rect x="36" y="50" width="30" height="6" rx="2" fill="#111"/></svg>';
+    // Access Point / WiFi
+    const apSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><circle cx="32" cy="38" r="7" fill="#2a7dc9" stroke="#1a5fa8" stroke-width="2"/><circle cx="32" cy="38" r="3" fill="white"/><path d="M18 26 Q32 14 46 26" stroke="#3a8de8" stroke-width="3" stroke-linecap="round" fill="none"/><path d="M23 31 Q32 22 41 31" stroke="#3a8de8" stroke-width="2.5" stroke-linecap="round" fill="none"/><line x1="32" y1="45" x2="32" y2="54" stroke="#2a7dc9" stroke-width="2"/><rect x="22" y="54" width="20" height="4" rx="2" fill="#2a7dc9" stroke="#1a5fa8" stroke-width="1.5"/></svg>';
 
-    let svg = switchSvg;
-    if (key.includes('router') || key.includes('gateway')) {
+    // Generic endpoint / unknown device: laptop-style icon
+    const endpointSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 52"><rect x="4" y="2" width="56" height="36" rx="4" fill="#1e1e1e"/><rect x="8" y="6" width="48" height="28" rx="2" fill="#2a2a2a"/><rect x="10" y="8" width="44" height="24" rx="1" fill="white"/><rect x="0" y="40" width="64" height="6" rx="3" fill="#2e2e2e"/><rect x="22" y="38" width="20" height="4" rx="1" fill="#1e1e1e"/></svg>';
+
+    let svg = endpointSvg;
+    if (key.includes('router') || key.includes('gateway') || key.includes('modem')) {
         svg = routerSvg;
     } else if (key.includes('server')) {
         svg = serverSvg;
@@ -896,11 +972,139 @@ function getTopologyIcon(type) {
         svg = apSvg;
     } else if (key.includes('switch')) {
         svg = switchSvg;
+    } else if (key.includes('endpoint') || key.includes('laptop') || key.includes('device')) {
+        svg = endpointSvg;
     }
 
     const icon = buildSvgDataUri(svg);
     topologyIconCache.set(key, icon);
     return icon;
+}
+
+function getBuildingIcon(status) {
+    const key = `bldg-${status}`;
+    if (topologyIconCache.has(key)) return topologyIconCache.get(key);
+    const fill  = status === 'Online' ? '#3a7bd5' : status === 'Offline' ? '#c0392b' : '#e67e22';
+    const roof  = status === 'Online' ? '#1e5bb5' : status === 'Offline' ? '#7b0000' : '#a84300';
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80">
+      <ellipse cx="40" cy="76" rx="26" ry="4" fill="#000" opacity="0.12"/>
+      <rect x="10" y="28" width="60" height="46" rx="3" fill="${fill}"/>
+      <polygon points="5,30 40,7 75,30" fill="${roof}"/>
+      <rect x="15" y="35" width="13" height="10" rx="1.5" fill="#c5e0f8" opacity="0.85"/>
+      <rect x="34" y="35" width="13" height="10" rx="1.5" fill="#c5e0f8" opacity="0.85"/>
+      <rect x="53" y="35" width="13" height="10" rx="1.5" fill="#c5e0f8" opacity="0.85"/>
+      <rect x="15" y="50" width="13" height="10" rx="1.5" fill="#c5e0f8" opacity="0.85"/>
+      <rect x="53" y="50" width="13" height="10" rx="1.5" fill="#c5e0f8" opacity="0.85"/>
+      <rect x="32" y="58" width="16" height="16" rx="2" fill="${roof}"/>
+    </svg>`;
+    const uri = buildSvgDataUri(svg);
+    topologyIconCache.set(key, uri);
+    return uri;
+}
+
+const BUILDING_IMAGE_MAP = {
+    'IC Building': '/images/ic-building.png',
+    'Unknown': '/images/unknown.png'
+};
+
+function buildBuildingTopologyData() {
+    const buildingMap = new Map();
+    campusDevices.forEach(device => {
+        const name = device.building || 'Unknown';
+        if (!buildingMap.has(name)) buildingMap.set(name, []);
+        buildingMap.get(name).push(device);
+    });
+
+    function aggStatus(devices) {
+        if (devices.some(d => d.status === 'Offline')) return 'Offline';
+        if (devices.some(d => d.status === 'Warning')) return 'Warning';
+        return 'Online';
+    }
+
+    // Spread building nodes in a circle so they never overlap
+    const buildingNames = [...buildingMap.keys()];
+    const total = buildingNames.length;
+    const RADIUS = total <= 1 ? 0 : Math.max(280, total * 100);
+
+    function buildingPosition(index) {
+        if (total === 1) return { x: 0, y: 0 };
+        const angle = (2 * Math.PI * index) / total - Math.PI / 2;
+        return { x: Math.round(RADIUS * Math.cos(angle)), y: Math.round(RADIUS * Math.sin(angle)) };
+    }
+
+    const nodes = [];
+    buildingNames.forEach((name, index) => {
+        const devices = buildingMap.get(name);
+        const status = aggStatus(devices);
+        const online = devices.filter(d => d.status === 'Online').length;
+        const image = BUILDING_IMAGE_MAP[name] || getBuildingIcon(status);
+        const pos = buildingPosition(index);
+        nodes.push({
+            id: `bldg::${name}`,
+            label: `${name}\n${online}/${devices.length} online`,
+            title: `${name} — ${devices.length} device(s), ${online} online`,
+            shape: 'image',
+            image,
+            size: 40,
+            x: pos.x,
+            y: pos.y,
+            fixed: { x: false, y: false },
+            borderWidth: 3,
+            color: {
+                border: statusColor(status),
+                background: '#ffffff',
+                highlight: { border: '#12b3c7', background: '#ffffff' }
+            },
+            font: { color: '#0f2338', size: 13, face: 'IBM Plex Sans', align: 'center' },
+            shapeProperties: { useBorderWithImage: true },
+            _buildingName: name
+        });
+    });
+
+    const devBuilding = new Map();
+    campusDevices.forEach(d => devBuilding.set(d.id, d.building || 'Unknown'));
+
+    const seen = new Set();
+    const edges = [];
+    campusLinks.forEach(link => {
+        const a = devBuilding.get(link.from);
+        const b = devBuilding.get(link.to);
+        if (!a || !b || a === b) return;
+        const key = [a, b].sort().join('||');
+        if (seen.has(key)) return;
+        seen.add(key);
+        edges.push({
+            id: `bedge::${key}`,
+            from: `bldg::${a}`,
+            to: `bldg::${b}`,
+            color: { color: '#1f7ae0' },
+            width: 2,
+            smooth: { type: 'dynamic' }
+        });
+    });
+
+    return { nodes, edges };
+}
+
+function drillIntoBuilding(buildingName) {
+    const viewModeSelect = document.getElementById('topology-view-mode');
+    const buildingFilter = document.getElementById('building-filter');
+    const hasFloorPlan = buildingName === 'IC Building';
+
+    if (hasFloorPlan) {
+        if (viewModeSelect) viewModeSelect.value = 'floor';
+        topologyViewMode = 'floor';
+        _setFloorMapShellVisible(true);
+        showBuildingFloorPlan(buildingName);
+    } else {
+        // No floor plan for this building — show its devices in logical view
+        if (buildingFilter) buildingFilter.value = buildingName;
+        if (viewModeSelect) viewModeSelect.value = 'logical';
+        topologyViewMode = 'logical';
+        hideFloorMap();
+        applyTopologyLayout('logical');
+        loadTopologySnapshot({ fit: true });
+    }
 }
 
 function buildTopologyLabel(device) {
@@ -913,13 +1117,134 @@ function buildTopologyTitle(device) {
     return parts.join(' | ');
 }
 
+const IP_PATTERN = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/;
+
+function deviceHasName(device) {
+    return device.name && !IP_PATTERN.test(device.name.trim()) && device.name.trim() !== device.ip;
+}
+
+function isKnownDeviceType(type) {
+    const t = (type || '').toLowerCase();
+    return t.includes('router') || t.includes('modem') || t.includes('gateway') ||
+           t.includes('phone') || t.includes('mobile') || t.includes('smartphone') ||
+           t.includes('pc') || t.includes('workstation') || t.includes('desktop') || t.includes('computer') ||
+           t.includes('switch') ||
+           t.includes('ap') || t.includes('wifi') || t.includes('wireless') || t.includes('access');
+}
+
+function matchesDeviceTypeFilter(device, filterValue) {
+    if (filterValue === 'all') return true;
+    const t = (device.type || '').toLowerCase();
+    switch (filterValue) {
+        case 'router':  return t.includes('router') || t.includes('modem') || t.includes('gateway');
+        case 'phone':   return t.includes('phone') || t.includes('mobile') || t.includes('smartphone');
+        case 'pc':      return t.includes('pc') || t.includes('workstation') || t.includes('desktop') || t.includes('computer');
+        case 'switch':  return t.includes('switch');
+        case 'ap':      return t.includes('ap') || t.includes('wifi') || t.includes('wireless') || t.includes('access');
+        case 'unknown': return true;
+        default:        return true;
+    }
+}
+
+function getDeviceHierarchyLevel(deviceType) {
+    const t = (deviceType || '').toLowerCase();
+    if (t.includes('router') || t.includes('modem') || t.includes('gateway')) return 0;
+    if (t.includes('switch')) return 1;
+    if (t.includes('server') || t.includes('ap') || t.includes('wifi') || t.includes('wireless') || t.includes('access')) return 2;
+    return 3;
+}
+
+function computeTopologyLevels(devices, links) {
+    const adj = new Map();
+    devices.forEach(d => adj.set(d.id, []));
+    links.forEach(link => {
+        if (adj.has(link.from) && adj.has(link.to)) {
+            adj.get(link.from).push(link.to);
+            adj.get(link.to).push(link.from);
+        }
+    });
+
+    // Root = router/gateway first; else most-connected device
+    let root = devices.find(d => {
+        const t = (d.type || '').toLowerCase();
+        return t.includes('router') || t.includes('gateway') || t.includes('modem');
+    });
+    if (!root && devices.length > 0) {
+        root = devices.reduce((best, d) =>
+            (adj.get(d.id) || []).length > (adj.get(best.id) || []).length ? d : best,
+            devices[0]
+        );
+    }
+
+    const levels = new Map();
+    if (root) {
+        const queue = [root.id];
+        levels.set(root.id, 0);
+        while (queue.length) {
+            const curr = queue.shift();
+            for (const neighbor of (adj.get(curr) || [])) {
+                if (!levels.has(neighbor)) {
+                    levels.set(neighbor, levels.get(curr) + 1);
+                    queue.push(neighbor);
+                }
+            }
+        }
+    }
+
+    // Fallback for disconnected nodes: use device-type tier
+    devices.forEach(d => {
+        if (!levels.has(d.id)) levels.set(d.id, getDeviceHierarchyLevel(d.type));
+    });
+
+    return levels;
+}
+
+function buildStarPositions(devices, links) {
+    if (!devices.length) return new Map();
+
+    const connCount = new Map(devices.map(d => [d.id, 0]));
+    links.forEach(l => {
+        if (connCount.has(l.from)) connCount.set(l.from, connCount.get(l.from) + 1);
+        if (connCount.has(l.to)) connCount.set(l.to, connCount.get(l.to) + 1);
+    });
+
+    // Prefer router/gateway as center; fallback to most-connected
+    let center = devices.find(d => {
+        const t = (d.type || '').toLowerCase();
+        return t.includes('router') || t.includes('gateway') || t.includes('modem');
+    });
+    if (!center) {
+        center = [...devices].sort((a, b) => (connCount.get(b.id) || 0) - (connCount.get(a.id) || 0))[0];
+    }
+
+    const others = devices.filter(d => d.id !== center.id);
+
+    const positions = new Map();
+    positions.set(center.id, { x: 0, y: 0 });
+
+    if (others.length > 0) {
+        const radius = Math.max(220, others.length * 42);
+        const angleStep = (2 * Math.PI) / others.length;
+        others.forEach((d, i) => {
+            positions.set(d.id, {
+                x: Math.round(radius * Math.cos(i * angleStep - Math.PI / 2)),
+                y: Math.round(radius * Math.sin(i * angleStep - Math.PI / 2))
+            });
+        });
+    }
+
+    return positions;
+}
+
 function getTopologyFilters() {
     const buildingFilter = document.getElementById('building-filter');
     const statusFilter = document.getElementById('status-filter');
+    const deviceTypeFilter = document.getElementById('device-type-filter');
 
     return {
         building: buildingFilter ? buildingFilter.value : 'all',
-        status: statusFilter ? statusFilter.value : 'all'
+        status: statusFilter ? statusFilter.value : 'all',
+        deviceType: deviceTypeFilter ? deviceTypeFilter.value : 'all'
     };
 }
 
@@ -1041,6 +1366,14 @@ function updateTopologyData(options = {}) {
             }
         });
     }
+
+    if (topologyViewMode === 'realtime') {
+        renderRealtimeFloorMap();
+    }
+
+    if (topologyViewMode === 'floor' && floorDotsEnabled) {
+        renderFloorMapDots();
+    }
 }
 
 // ---- Floor Map ----
@@ -1119,28 +1452,25 @@ function makeMarkerDraggable(marker, container, key) {
     });
 }
 
-function renderFloorMap(floorNum) {
-    const container = document.getElementById('floor-map-container');
-    const img = document.getElementById('floor-map-img');
-    if (!container || !img) return;
+function renderFloorMap() {
+    const floor1El = document.getElementById('floor-map-1');
+    const floor2El = document.getElementById('floor-map-2');
+    if (!floor1El || !floor2El) return;
 
-    img.src = floorNum === 2 ? '../images/2ndFloor.jpg' : '../images/1stFloor.jpg';
-
-    container.querySelectorAll('.floor-device-marker').forEach(el => el.remove());
+    floor1El.querySelectorAll('.floor-device-marker').forEach(el => el.remove());
+    floor2El.querySelectorAll('.floor-device-marker').forEach(el => el.remove());
 
     const positions = getFloorPositions();
     const devices = (typeof devicesData !== 'undefined' && devicesData.length) ? devicesData :
                     (typeof topologyDevices !== 'undefined' ? topologyDevices : []);
 
-    let visibleIndex = 0;
-    const visibleDevices = devices.filter(d => {
-        const df = getDeviceFloorNumber(d);
-        return df === null || df === floorNum;
-    });
+    devices.forEach((device, idx) => {
+        const df = getDeviceFloorNumber(device);
+        const targetEl = df === 2 ? floor2El : floor1El;
 
-    visibleDevices.forEach((device, idx) => {
         const key = typeof getDeviceKey === 'function' ? getDeviceKey(device) : (device.ip || String(idx));
-        const pos = positions[key] || defaultFloorPosition(key, idx, visibleDevices.length);
+        const floorDevices = devices.filter(d => (df === 2 ? getDeviceFloorNumber(d) === 2 : getDeviceFloorNumber(d) !== 2));
+        const pos = positions[key] || defaultFloorPosition(key, idx, floorDevices.length);
 
         const marker = document.createElement('div');
         marker.className = 'floor-device-marker';
@@ -1157,79 +1487,439 @@ function renderFloorMap(floorNum) {
 
         marker.appendChild(dot);
         marker.appendChild(label);
-        container.appendChild(marker);
-        makeMarkerDraggable(marker, container, key);
-        visibleIndex++;
+        targetEl.appendChild(marker);
+        makeMarkerDraggable(marker, targetEl, key);
     });
 }
 
-function showFloorMap() {
+let floorDotsEnabled = false;
+
+function _setFloorMapShellVisible(visible) {
     const container = document.getElementById('floor-map-container');
     const network = document.getElementById('network');
-    const floorGroup = document.getElementById('floor-selector-group');
     const resetCol = document.getElementById('reset-btn-col');
+    const detailCol = document.getElementById('topology-detail-col');
+    const mapCol = document.getElementById('topology-map-col');
+    if (container) container.style.display = visible ? 'block' : 'none';
+    if (network) network.style.display = visible ? 'none' : '';
+    if (resetCol) resetCol.style.display = visible ? 'none' : '';
+    // When live-dots are on, show the detail panel so clicked dots can display info
+    if (detailCol) detailCol.style.display = (visible && !floorDotsEnabled) ? 'none' : '';
+    if (mapCol) mapCol.className = (visible && !floorDotsEnabled) ? 'col-12' : 'col-12 col-xl-8';
+}
 
-    if (container) container.style.display = 'block';
-    if (network) network.style.display = 'none';
-    if (floorGroup) floorGroup.style.display = '';
-    if (resetCol) resetCol.style.display = 'none';
+window.toggleFloorDots = function toggleFloorDots() {
+    floorDotsEnabled = !floorDotsEnabled;
 
-    renderFloorMap(currentFloor);
+    // Update button visual
+    const btn = document.getElementById('floor-dots-toggle');
+    const knob = document.getElementById('floor-dots-knob');
+    if (btn) btn.style.background = floorDotsEnabled ? 'rgba(34,197,94,0.25)' : 'rgba(255,255,255,0.12)';
+    if (btn) btn.style.borderColor = floorDotsEnabled ? '#22c55e' : 'rgba(255,255,255,0.35)';
+    if (knob) knob.style.background = floorDotsEnabled ? '#22c55e' : '#aaa';
+
+    // Re-apply layout (shows/hides detail col based on toggle)
+    _setFloorMapShellVisible(true);
+
+    const overlayIds = ['floor-dot-overlay-1', 'floor-dot-overlay-2'];
+    if (floorDotsEnabled) {
+        overlayIds.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.style.display = 'block';
+        });
+        requestAnimationFrame(() => requestAnimationFrame(renderFloorMapDots));
+    } else {
+        overlayIds.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) { el.innerHTML = ''; el.style.display = 'none'; }
+        });
+    }
+};
+
+function showFloorMap() {
+    _setFloorMapShellVisible(true);
+    showBuildingPicker();
 }
 
 function hideFloorMap() {
-    const container = document.getElementById('floor-map-container');
-    const network = document.getElementById('network');
-    const floorGroup = document.getElementById('floor-selector-group');
-    const resetCol = document.getElementById('reset-btn-col');
-
-    if (container) container.style.display = 'none';
-    if (network) network.style.display = '';
-    if (floorGroup) floorGroup.style.display = 'none';
-    if (resetCol) resetCol.style.display = '';
+    _setFloorMapShellVisible(false);
 }
+
+window.showBuildingPicker = function showBuildingPicker() {
+    const picker = document.getElementById('building-picker');
+    const floorView = document.getElementById('floor-plan-view');
+    if (picker) picker.style.display = 'block';
+    if (floorView) floorView.style.display = 'none';
+    _renderBuildingCards();
+};
+
+function _renderBuildingCards() {
+    const cardsEl = document.getElementById('building-picker-cards');
+    if (!cardsEl) return;
+
+    // Always include IC Building (the only one with floor plans)
+    const discovered = [...new Set((campusDevices || []).map(d => d.building).filter(Boolean))];
+    const allBuildings = [...new Set(['IC Building', ...discovered])];
+
+    cardsEl.innerHTML = '';
+    allBuildings.forEach(bName => {
+        const total  = (campusDevices || []).filter(d => d.building === bName).length;
+        const online = (campusDevices || []).filter(d => d.building === bName && d.status === 'Online').length;
+        const imgSrc = BUILDING_IMAGE_MAP[bName] || '../images/unknown.png';
+        const hasFloorPlan = (bName === 'IC Building');
+
+        const card = document.createElement('div');
+        card.style.cssText = [
+            'width:210px', 'background:white', 'border-radius:12px',
+            'overflow:hidden', 'box-shadow:0 2px 12px rgba(0,0,0,0.13)',
+            'cursor:' + (hasFloorPlan ? 'pointer' : 'default'),
+            'transition:transform 0.15s,box-shadow 0.15s', 'flex-shrink:0'
+        ].join(';');
+
+        if (hasFloorPlan) {
+            card.addEventListener('mouseenter', () => {
+                card.style.transform = 'translateY(-5px)';
+                card.style.boxShadow = '0 8px 24px rgba(0,0,0,0.18)';
+            });
+            card.addEventListener('mouseleave', () => {
+                card.style.transform = '';
+                card.style.boxShadow = '0 2px 12px rgba(0,0,0,0.13)';
+            });
+            card.addEventListener('click', () => showBuildingFloorPlan(bName));
+        }
+
+        card.innerHTML = `
+            <div style="height:130px;overflow:hidden;background:#dce4ee;">
+                <img src="${imgSrc}" alt="${escapeHtml(bName)}"
+                     style="width:100%;height:100%;object-fit:cover;"
+                     onerror="this.style.display='none'">
+            </div>
+            <div style="padding:12px 14px;">
+                <div style="font-weight:700;font-family:'Sora',sans-serif;font-size:13px;color:#0f2338;margin-bottom:4px;">${escapeHtml(bName)}</div>
+                <div style="font-size:11px;color:#6c757d;">${total} device${total !== 1 ? 's' : ''} &nbsp;·&nbsp; ${online} online</div>
+                <div style="margin-top:8px;font-size:11px;font-weight:600;color:${hasFloorPlan ? '#1a3a6e' : '#bbb'};">
+                    ${hasFloorPlan ? 'View Floor Plan &rarr;' : 'No floor plan available'}
+                </div>
+            </div>`;
+        cardsEl.appendChild(card);
+    });
+}
+
+window.showBuildingFloorPlan = function showBuildingFloorPlan(bName) {
+    const picker  = document.getElementById('building-picker');
+    const floorView = document.getElementById('floor-plan-view');
+    const nameEl  = document.getElementById('floor-plan-building-name');
+
+    if (picker) picker.style.display = 'none';
+    if (floorView) { floorView.style.display = 'flex'; }
+    if (nameEl) nameEl.textContent = bName;
+
+    const buildingFilter = document.getElementById('building-filter');
+    if (buildingFilter) buildingFilter.value = bName;
+
+    renderFloorMap();
+
+    if (floorDotsEnabled) {
+        const overlayIds = ['floor-dot-overlay-1', 'floor-dot-overlay-2'];
+        overlayIds.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.style.display = 'block';
+        });
+        requestAnimationFrame(() => requestAnimationFrame(renderFloorMapDots));
+    }
+};
 
 window.switchFloor = function (floorNum) {
     currentFloor = floorNum;
-    document.getElementById('floor-btn-1').classList.toggle('active', floorNum === 1);
-    document.getElementById('floor-btn-2').classList.toggle('active', floorNum === 2);
-    renderFloorMap(floorNum);
+    renderFloorMap();
 };
 
 // ---- End Floor Map ----
 
+// ---- Realtime Floor Map ----
+
+// Room registry — SVG-space fractional bounds (x,y,w,h as 0-1 of viewBox)
+// 1st floor: viewBox 920x520, 2nd floor: viewBox 1020x520
+const REALTIME_ROOMS = [
+    // ── 1st Floor ──
+    { floor: '1st floor', keys: ['faculty 1','faculty1'], x:30/920, y:30/520, w:315/920, h:185/520 },
+    { floor: '1st floor', keys: ['accreditation','accreditation room'], x:345/920, y:30/520, w:265/920, h:185/520 },
+    { floor: '1st floor', keys: ['netlab','net lab'], x:610/920, y:30/520, w:280/920, h:185/520 },
+    { floor: '1st floor', keys: ['faculty 2','faculty2'], x:30/920, y:275/520, w:270/920, h:195/520 },
+    { floor: '1st floor', keys: ['comlab 1','comlab1','computer lab 1'], x:390/920, y:275/520, w:410/920, h:195/520 },
+    // ── 2nd Floor ──
+    { floor: '2nd floor', keys: ['maclab','mac lab'], x:30/1020, y:30/520, w:330/1020, h:185/520 },
+    { floor: '2nd floor', keys: ['aes','aes lab'], x:360/1020, y:30/520, w:230/1020, h:185/520 },
+    { floor: '2nd floor', keys: ['gda','gda lab'], x:590/1020, y:30/520, w:200/1020, h:185/520 },
+    { floor: '2nd floor', keys: ['server room','server'], x:30/1020, y:275/520, w:240/1020, h:195/520 },
+    { floor: '2nd floor', keys: ['comlab 2','comlab2','computer lab 2'], x:360/1020, y:275/520, w:340/1020, h:195/520 },
+    { floor: '2nd floor', keys: ['faculty 3','faculty3'], x:790/1020, y:30/520, w:200/1020, h:440/520 },
+];
+
+function matchRoomEntry(device) {
+    const roomRaw = String(device.room || device.floor || '').toLowerCase().trim();
+    const floorRaw = String(device.floor || '').toLowerCase().trim();
+    return REALTIME_ROOMS.find(r =>
+        r.keys.some(k => roomRaw === k || roomRaw.includes(k)) &&
+        (floorRaw === '' || r.floor === floorRaw || floorRaw.includes(r.floor.split(' ')[0]))
+    ) || REALTIME_ROOMS.find(r => r.keys.some(k => roomRaw === k || roomRaw.includes(k)));
+}
+
+// Calculate the pixel bounds of an object-fit:contain image inside its wrapper
+function getContainImageBounds(wrapper, naturalW, naturalH) {
+    const cw = wrapper.clientWidth;
+    const ch = wrapper.clientHeight;
+    if (!cw || !ch) return null;
+    const imgRatio = naturalW / naturalH;
+    const containerRatio = cw / ch;
+    let rw, rh, ox, oy;
+    if (imgRatio > containerRatio) {
+        rw = cw; rh = cw / imgRatio; ox = 0; oy = (ch - rh) / 2;
+    } else {
+        rh = ch; rw = ch * imgRatio; oy = 0; ox = (cw - rw) / 2;
+    }
+    return { x: ox, y: oy, w: rw, h: rh };
+}
+
+// Deterministic dot scatter within a room rect (avoids pure overlap)
+function dotPositionInRoom(index, total, roomPx) {
+    const DOT = 14; // dot diameter px
+    const PADDING = DOT * 1.6;
+    const usableW = roomPx.w - PADDING * 2;
+    const usableH = roomPx.h - PADDING * 2;
+    const cols = Math.max(1, Math.min(5, Math.ceil(Math.sqrt(total * (usableW / Math.max(usableH, 1))))));
+    const rows = Math.ceil(total / cols);
+    const cellW = usableW / cols;
+    const cellH = usableH / rows;
+    const col = index % cols;
+    const row = Math.floor(index / cols);
+    return {
+        x: roomPx.x + PADDING + col * cellW + cellW / 2,
+        y: roomPx.y + PADDING + row * cellH + cellH / 2
+    };
+}
+
+// Generic room-dot renderer — used by both realtime map and floor-based map
+function _renderRoomDotsOnConfig(configs) {
+    const selectedDeviceId = topologySelectedId;
+    configs.forEach(({ floorKey, svgW, svgH, wrapperId, overlayId }) => {
+        const overlay = document.getElementById(overlayId);
+        const wrapper = document.getElementById(wrapperId);
+        if (!overlay || !wrapper) return;
+
+        const bounds = getContainImageBounds(wrapper, svgW, svgH);
+        if (!bounds) return;
+
+        const roomGroups = new Map();
+        campusDevices.forEach(device => {
+            const entry = matchRoomEntry(device);
+            if (!entry || entry.floor !== floorKey) return;
+            if (!roomGroups.has(entry)) roomGroups.set(entry, []);
+            roomGroups.get(entry).push(device);
+        });
+
+        let html = '';
+
+        roomGroups.forEach((devices, entry) => {
+            const roomPx = {
+                x: bounds.x + entry.x * bounds.w,
+                y: bounds.y + entry.y * bounds.h,
+                w: entry.w * bounds.w,
+                h: entry.h * bounds.h
+            };
+
+            const online = devices.filter(d => d.status === 'Online').length;
+            const offline = devices.filter(d => d.status === 'Offline').length;
+            const total = devices.length;
+
+            const badgeX = roomPx.x + roomPx.w - 4;
+            const badgeY = roomPx.y + 4;
+            const badgeColor = offline > 0 ? '#ef4444' : '#22c55e';
+            html += `<div style="position:absolute;left:${badgeX}px;top:${badgeY}px;transform:translateX(-100%);
+                background:${badgeColor};color:white;font-size:10px;font-weight:700;font-family:'IBM Plex Sans',sans-serif;
+                padding:2px 6px;border-radius:10px;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,0.25);z-index:10;">
+                ${online}/${total}
+            </div>`;
+
+            devices.forEach((device, idx) => {
+                const pos = dotPositionInRoom(idx, total, roomPx);
+                const color = device.status === 'Online' ? '#22c55e'
+                    : device.status === 'Warning' ? '#f59e0b' : '#ef4444';
+                const label = escapeHtml(device.name || device.ip || 'Device');
+                const ipLabel = escapeHtml(device.ip || '');
+                const devId = escapeHtml(String(device.id || ''));
+                html += `<div title="${label}&#10;${ipLabel}&#10;${device.status}"
+                    data-rt-device-id="${devId}"
+                    style="position:absolute;width:14px;height:14px;border-radius:50%;
+                    background:${color};border:2px solid white;
+                    box-shadow:0 1px 4px rgba(0,0,0,0.3);
+                    left:${pos.x - 7}px;top:${pos.y - 7}px;z-index:5;
+                    pointer-events:auto;cursor:pointer;transition:transform 0.15s,outline 0.1s;"
+                    onmouseenter="this.style.transform='scale(1.5)'"
+                    onmouseleave="if(!this.classList.contains('rt-dot-selected'))this.style.transform='scale(1)'"
+                    onclick="selectRealtimeDot(this,'${devId}')">
+                </div>`;
+            });
+        });
+
+        overlay.innerHTML = html;
+
+        if (selectedDeviceId) {
+            const sel = overlay.querySelector(`[data-rt-device-id="${selectedDeviceId}"]`);
+            if (sel) {
+                sel.classList.add('rt-dot-selected');
+                sel.style.outline = '3px solid #facc15';
+                sel.style.outlineOffset = '2px';
+                sel.style.transform = 'scale(1.5)';
+            }
+        }
+    });
+}
+
+function renderRealtimeFloorMap() {
+    _renderRoomDotsOnConfig([
+        { floorKey: '1st floor', svgW: 920, svgH: 520, wrapperId: 'realtime-floor-1-wrap', overlayId: 'realtime-overlay-1' },
+        { floorKey: '2nd floor', svgW: 1020, svgH: 520, wrapperId: 'realtime-floor-2-wrap', overlayId: 'realtime-overlay-2' }
+    ]);
+}
+
+function renderFloorMapDots() {
+    _renderRoomDotsOnConfig([
+        { floorKey: '1st floor', svgW: 920, svgH: 520, wrapperId: 'floor-map-1', overlayId: 'floor-dot-overlay-1' },
+        { floorKey: '2nd floor', svgW: 1020, svgH: 520, wrapperId: 'floor-map-2', overlayId: 'floor-dot-overlay-2' }
+    ]);
+}
+
+function selectRealtimeDot(dotEl, deviceId) {
+    // Clear previous selection highlight
+    document.querySelectorAll('.rt-dot-selected').forEach(el => {
+        el.classList.remove('rt-dot-selected');
+        el.style.outline = '';
+        el.style.transform = 'scale(1)';
+    });
+    dotEl.classList.add('rt-dot-selected');
+    dotEl.style.outline = '3px solid #facc15';
+    dotEl.style.outlineOffset = '2px';
+    dotEl.style.transform = 'scale(1.5)';
+
+    renderSelectedDevice(deviceId);
+
+    // Scroll device detail panel into view on small screens
+    const panel = document.getElementById('topology-detail-col');
+    if (panel) panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function showRealtimeFloorMap() {
+    const network = document.getElementById('network');
+    const rtContainer = document.getElementById('realtime-floor-container');
+    if (network) network.style.display = 'none';
+    if (rtContainer) rtContainer.style.display = 'block';
+    // Defer render until after layout paint so clientWidth/Height are correct
+    requestAnimationFrame(() => requestAnimationFrame(renderRealtimeFloorMap));
+}
+
+function hideRealtimeFloorMap() {
+    const network = document.getElementById('network');
+    const rtContainer = document.getElementById('realtime-floor-container');
+    if (network) network.style.display = 'block';
+    if (rtContainer) rtContainer.style.display = 'none';
+}
+
+// ---- End Realtime Floor Map ----
+
 function applyTopologyLayout(viewMode) {
+    if (viewMode === 'floor') {
+        hideRealtimeFloorMap();
+        showFloorMap();
+        return;
+    }
+
+    if (viewMode === 'realtime') {
+        hideFloorMap();
+        showRealtimeFloorMap();
+        return;
+    }
+
     if (!topologyNetwork) return;
 
-    if (viewMode === 'hierarchy') {
+    hideFloorMap();
+    hideRealtimeFloorMap();
+
+    const deviceTypeEl = document.getElementById('device-type-filter');
+    const deviceTypeVal = deviceTypeEl ? deviceTypeEl.value : 'all';
+    const isStarMode = deviceTypeVal === 'unknown';
+    const isAllDevices = deviceTypeVal === 'all';
+
+    if (isStarMode) {
+        topologyNetwork.setOptions({
+            layout: { hierarchical: { enabled: false } },
+            physics: { enabled: false },
+            interaction: { dragNodes: true, dragView: true, zoomView: true }
+        });
+        return;
+    }
+
+    // "All Devices" always renders as a top-down hierarchy regardless of view mode
+    if (isAllDevices && viewMode !== 'buildings' && viewMode !== 'floor') {
         topologyNetwork.setOptions({
             layout: {
                 hierarchical: {
                     enabled: true,
                     direction: 'UD',
-                    sortMethod: 'hubsize',
-                    levelSeparation: 150,
-                    nodeSpacing: 120,
-                    treeSpacing: 200
+                    sortMethod: 'directed',
+                    levelSeparation: 160,
+                    nodeSpacing: 140,
+                    treeSpacing: 220
                 }
             },
             physics: { enabled: false },
-            interaction: {
-                dragNodes: true,
-                dragView: true,
-                zoomView: true
-            }
+            interaction: { dragNodes: true, dragView: true, zoomView: true }
         });
         topologyNetwork.fit({ animation: { duration: 400, easingFunction: 'easeInOutQuad' } });
         return;
     }
 
-    if (viewMode === 'floor') {
-        showFloorMap();
+    if (viewMode === 'buildings') {
+        topologyNetwork.setOptions({
+            layout: { hierarchical: { enabled: false } },
+            physics: {
+                enabled: true,
+                solver: 'repulsion',
+                repulsion: {
+                    nodeDistance: 350,
+                    centralGravity: 0.05,
+                    springLength: 300,
+                    springConstant: 0.02,
+                    damping: 0.9
+                },
+                stabilization: { iterations: 80 }
+            },
+            interaction: { dragNodes: true, dragView: true, zoomView: true }
+        });
+        topologyNetwork.once('stabilized', () => {
+            topologyNetwork.fit({ animation: { duration: 400, easingFunction: 'easeInOutQuad' } });
+        });
         return;
     }
 
-    hideFloorMap();
+    if (viewMode === 'logical') {
+        topologyNetwork.setOptions({
+            layout: {
+                hierarchical: {
+                    enabled: true,
+                    direction: 'UD',
+                    sortMethod: 'directed',
+                    levelSeparation: 160,
+                    nodeSpacing: 140,
+                    treeSpacing: 220
+                }
+            },
+            physics: { enabled: false },
+            interaction: { dragNodes: true, dragView: true, zoomView: true }
+        });
+        topologyNetwork.fit({ animation: { duration: 400, easingFunction: 'easeInOutQuad' } });
+        return;
+    }
 
     topologyNetwork.setOptions({
         layout: { hierarchical: { enabled: false } },
@@ -1242,13 +1932,9 @@ function applyTopologyLayout(viewMode) {
                 springLength: 190,
                 springConstant: 0.08
             },
-            stabilization: { iterations: 140 }
+            stabilization: { enabled: false }
         },
-        interaction: {
-            dragNodes: true,
-            dragView: true,
-            zoomView: true
-        }
+        interaction: { dragNodes: true, dragView: true, zoomView: true }
     });
 }
 
@@ -1334,15 +2020,22 @@ function stopTopologyRealtime() {
 }
 
 function buildTopologyData() {
+    if (topologyViewMode === 'buildings') return buildBuildingTopologyData();
     const filters = getTopologyFilters();
 
     const filteredDevices = campusDevices.filter(device => {
         const passBuilding = filters.building === 'all' || device.building === filters.building;
         const passStatus = filters.status === 'all' || device.status === filters.status;
-        return passBuilding && passStatus;
+        const passType = matchesDeviceTypeFilter(device, filters.deviceType);
+        return passBuilding && passStatus && passType;
     });
 
     const visibleIds = new Set(filteredDevices.map(device => device.id));
+    const visibleLinks = campusLinks.filter(l => visibleIds.has(l.from) && visibleIds.has(l.to));
+
+    const isStarMode = filters.deviceType === 'unknown';
+    const levelMap = isStarMode ? null : computeTopologyLevels(filteredDevices, visibleLinks);
+    const starPos = isStarMode ? buildStarPositions(filteredDevices, visibleLinks) : null;
 
     const nodes = filteredDevices.map(device => {
         const nodeColor = statusColor(device.status);
@@ -1352,7 +2045,7 @@ function buildTopologyData() {
             title: buildTopologyTitle(device),
             shape: 'image',
             image: getTopologyIcon(device.type),
-            size: 30,
+            size: 26,
             borderWidth: 2,
             color: {
                 border: nodeColor,
@@ -1373,18 +2066,63 @@ function buildTopologyData() {
             }
         };
 
-        if (Number.isFinite(device.x) && Number.isFinite(device.y)) {
-            node.x = device.x;
-            node.y = device.y;
-            node.fixed = device.locked === true;
+        if (isStarMode && starPos) {
+            const pos = starPos.get(device.id);
+            if (pos) { node.x = pos.x; node.y = pos.y; }
+        } else {
+            node.level = levelMap.get(device.id) ?? getDeviceHierarchyLevel(device.type);
+            if (Number.isFinite(device.x) && Number.isFinite(device.y)) {
+                node.x = device.x;
+                node.y = device.y;
+                node.fixed = device.locked === true;
+            }
         }
 
         return node;
     });
 
-    const edges = campusLinks
-        .filter(link => visibleIds.has(link.from) && visibleIds.has(link.to))
-        .map(link => {
+    let edges;
+    if (isStarMode && starPos) {
+        // In star mode: draw a spoke from every outer node to the center
+        const centerId = [...starPos.entries()].find(([, pos]) => pos.x === 0 && pos.y === 0)?.[0];
+        const existingPairs = new Set(visibleLinks.map(l => `${l.from}|${l.to}`));
+
+        const realEdges = visibleLinks.map(link => {
+            const baseColor = linkColor(link.status);
+            return {
+                id: link.id,
+                from: link.from,
+                to: link.to,
+                color: { color: baseColor },
+                width: 2,
+                dashes: false,
+                smooth: { type: 'curvedCW', roundness: 0.1 },
+                arrows: { to: { enabled: false } },
+                status: link.status,
+                baseColor
+            };
+        });
+
+        const spokeEdges = centerId
+            ? filteredDevices
+                .filter(d => d.id !== centerId &&
+                    !existingPairs.has(`${d.id}|${centerId}`) &&
+                    !existingPairs.has(`${centerId}|${d.id}`))
+                .map(d => ({
+                    id: `star-spoke-${d.id}`,
+                    from: centerId,
+                    to: d.id,
+                    color: { color: '#90a4ae' },
+                    width: 1.5,
+                    dashes: false,
+                    smooth: { type: 'curvedCW', roundness: 0.1 },
+                    arrows: { to: { enabled: false } }
+                }))
+            : [];
+
+        edges = [...realEdges, ...spokeEdges];
+    } else {
+        edges = visibleLinks.map(link => {
             const baseColor = linkColor(link.status);
             const labelParts = [link.medium, link.bandwidth].filter(Boolean);
             return {
@@ -1401,6 +2139,7 @@ function buildTopologyData() {
                 baseColor
             };
         });
+    }
 
     return { nodes, edges };
 }
@@ -1460,7 +2199,7 @@ function renderSelectedDevice(deviceId) {
 }
 
 function refreshTopology() {
-    updateTopologyData({ fit: true });
+    updateTopologyData({ fit: false });
 }
 
 function initTopology() {
@@ -1505,13 +2244,19 @@ function initTopology() {
                 springLength: 190,
                 springConstant: 0.08
             },
-            stabilization: { iterations: 140 }
+            stabilization: { enabled: false }
         }
     });
 
     topologyNetwork.on('click', params => {
         if (params.nodes && params.nodes.length) {
-            renderSelectedDevice(String(params.nodes[0]));
+            const nodeId = String(params.nodes[0]);
+            if (topologyViewMode === 'buildings') {
+                const node = topologyNodes.get(nodeId);
+                if (node && node._buildingName) drillIntoBuilding(node._buildingName);
+            } else {
+                renderSelectedDevice(nodeId);
+            }
         } else {
             renderSelectedDevice(null);
         }
@@ -1521,11 +2266,41 @@ function initTopology() {
 
     const buildingFilter = document.getElementById('building-filter');
     const statusFilter = document.getElementById('status-filter');
+    const deviceTypeFilter = document.getElementById('device-type-filter');
     const resetButton = document.getElementById('reset-topology-btn');
     const viewModeSelect = document.getElementById('topology-view-mode');
 
-    if (buildingFilter) buildingFilter.addEventListener('change', refreshTopology);
-    if (statusFilter) statusFilter.addEventListener('change', refreshTopology);
+    if (buildingFilter) buildingFilter.addEventListener('change', function () {
+        if (topologyViewMode === 'floor') {
+            const selected = buildingFilter.value;
+            if (selected === 'all') {
+                showBuildingPicker();
+            } else if (selected === 'IC Building') {
+                showBuildingFloorPlan(selected);
+            } else {
+                topologyViewMode = 'logical';
+                if (viewModeSelect) viewModeSelect.value = 'logical';
+                hideFloorMap();
+                applyTopologyLayout('logical');
+                loadTopologySnapshot({ fit: true });
+            }
+        } else {
+            refreshTopology();
+        }
+    });
+    if (statusFilter) statusFilter.addEventListener('change', function () {
+        if (topologyViewMode === 'floor') {
+            renderFloorMap();
+        } else {
+            refreshTopology();
+        }
+    });
+    if (deviceTypeFilter) deviceTypeFilter.addEventListener('change', function () {
+        if (topologyViewMode !== 'floor') {
+            applyTopologyLayout(topologyViewMode);
+            updateTopologyData({ fit: false });
+        }
+    });
     if (viewModeSelect) {
         topologyViewMode = viewModeSelect.value || 'logical';
         viewModeSelect.addEventListener('change', function () {
@@ -1544,6 +2319,7 @@ function initTopology() {
         resetButton.addEventListener('click', function () {
             if (buildingFilter) buildingFilter.value = 'all';
             if (statusFilter) statusFilter.value = 'all';
+            if (deviceTypeFilter) deviceTypeFilter.value = 'all';
             refreshTopology();
         });
     }
@@ -1753,8 +2529,7 @@ async function loadSidebar() {
 }
 
 function getSettingsApiBase() {
-    const host = window.location.hostname || 'localhost';
-    return window.MONITOR_API_BASE || `http://${host}:4000`;
+    return window.MONITOR_API_BASE || window.location.origin;
 }
 
 async function fetchScanSettings() {

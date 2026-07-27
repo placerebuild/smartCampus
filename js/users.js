@@ -1,4 +1,4 @@
-const USERS_API_BASE = window.MONITOR_API_BASE || `http://${window.location.hostname || 'localhost'}:4000`;
+const USERS_API_BASE = window.MONITOR_API_BASE || window.location.origin;
 
 let usersData = [];
 let pendingDeleteId = null;
