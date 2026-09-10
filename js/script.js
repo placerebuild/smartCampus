@@ -91,6 +91,7 @@ function applyDeviceResults(devices) {
     if (!Array.isArray(devices)) return;
     devicesData = devices.map(device => ({
         ...device,
+        lastSeenDate: device.lastSeen,
         lastSeen: formatLastSeen(device.lastSeen)
     }));
     populateDevicesTable();
@@ -102,14 +103,88 @@ function applyDeviceResults(devices) {
     }
 }
 
+function getDeviceFilters() {
+    return {
+        category: document.getElementById('device-category-filter')?.value || '',
+        date: document.getElementById('device-date-filter')?.value || ''
+    };
+}
+
+function getDeviceDateValue(device) {
+    const value = device.lastSeenDate || device.lastSeen;
+    if (!value) return '';
+
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
+function getFilteredDevices() {
+    const { category, date } = getDeviceFilters();
+    return devicesData.filter(device => {
+        const categoryMatches = !category || String(device.type || '') === category;
+        const dateMatches = !date || getDeviceDateValue(device) === date;
+        return categoryMatches && dateMatches;
+    });
+}
+
+function updateDeviceCategoryOptions() {
+    const select = document.getElementById('device-category-filter');
+    if (!select) return;
+
+    const selectedCategory = select.value;
+    const categories = [...new Set(devicesData
+        .map(device => String(device.type || '').trim())
+        .filter(Boolean))]
+        .sort((a, b) => a.localeCompare(b));
+
+    select.innerHTML = '<option value="">All categories</option>' + categories
+        .map(category => `<option value="${escapeHtml(category)}">${escapeHtml(category)}</option>`)
+        .join('');
+    select.value = categories.includes(selectedCategory) ? selectedCategory : '';
+}
+
+function updateDeviceFilterCount(visibleCount) {
+    const count = document.getElementById('device-filter-count');
+    if (!count) return;
+    count.textContent = `Showing ${visibleCount} of ${devicesData.length} device${devicesData.length === 1 ? '' : 's'}`;
+}
+
+function initDeviceFilters() {
+    const categoryFilter = document.getElementById('device-category-filter');
+    const dateFilter = document.getElementById('device-date-filter');
+    const clearButton = document.getElementById('clear-device-filters');
+    if (!categoryFilter || !dateFilter || !clearButton) return;
+
+    categoryFilter.addEventListener('change', populateDevicesTable);
+    dateFilter.addEventListener('change', populateDevicesTable);
+    clearButton.addEventListener('click', () => {
+        categoryFilter.value = '';
+        dateFilter.value = '';
+        populateDevicesTable();
+    });
+}
+
 
 
 function populateDevicesTable() {
     const tbody = document.querySelector('#devices-table tbody');
     if (!tbody) return;
 
+    updateDeviceCategoryOptions();
+    const filteredDevices = getFilteredDevices();
     tbody.innerHTML = '';
-    devicesData.forEach(dev => {
+    if (filteredDevices.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-4">No devices match the selected filters.</td></tr>';
+        updateDeviceFilterCount(0);
+        return;
+    }
+
+    filteredDevices.forEach(dev => {
         const statusHTML = buildStatusMarkup(dev.status);
         const deviceKey = getDeviceKey(dev);
         const macValue = formatDeviceValue(dev.mac);
@@ -132,6 +207,7 @@ function populateDevicesTable() {
                 </td>
             </tr>`;
     });
+    updateDeviceFilterCount(filteredDevices.length);
 }
 
 function openDeviceDetailsModal(device) {
@@ -2801,6 +2877,7 @@ function initDashboardRealtime() {
 window.addEventListener('load', async function () {
     await loadSidebar();
     await initScanSettings();
+    initDeviceFilters();
     populateDevicesTable();
     initDeviceTableActions();
     populateRecentAlerts();

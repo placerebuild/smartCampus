@@ -30,6 +30,22 @@
         <p class="text-muted mb-3">Campus network devices (IC Building for now). Data will be loaded from the database
             once the device list is provided.</p>
         <div class="card panel-card p-3">
+            <div class="device-filter-bar" aria-label="Filter devices">
+                <div class="device-filter-field">
+                    <label for="device-category-filter" class="form-label">Category</label>
+                    <select id="device-category-filter" class="form-select">
+                        <option value="">All categories</option>
+                    </select>
+                </div>
+                <div class="device-filter-field">
+                    <label for="device-date-filter" class="form-label">Date</label>
+                    <input id="device-date-filter" class="form-control" type="date">
+                </div>
+                <button id="clear-device-filters" class="btn btn-outline-secondary" type="button">
+                    <i class="fas fa-rotate-left me-1" aria-hidden="true"></i> Clear filters
+                </button>
+                <p id="device-filter-count" class="device-filter-count mb-0" aria-live="polite"></p>
+            </div>
             <div class="table-responsive">
                 <table class="table table-hover align-middle" id="devices-table">
                     <thead class="table-light">

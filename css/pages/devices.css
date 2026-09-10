@@ -288,6 +288,43 @@ body.sidebar-layout {
     color: #12304d;
 }
 
+.device-filter-bar {
+    display: flex;
+    align-items: end;
+    flex-wrap: wrap;
+    gap: 0.85rem;
+    padding-bottom: 1rem;
+    margin-bottom: 0.35rem;
+    border-bottom: 1px solid #e5eef8;
+}
+
+.device-filter-field {
+    min-width: 190px;
+    flex: 1 1 220px;
+}
+
+.device-filter-field .form-label {
+    margin-bottom: 0.35rem;
+    color: #4f6681;
+    font-size: 0.76rem;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+}
+
+.device-filter-field .form-select,
+.device-filter-field .form-control {
+    border-color: #d4e2f2;
+    border-radius: 10px;
+}
+
+.device-filter-count {
+    color: var(--text-500);
+    font-size: 0.88rem;
+    font-weight: 600;
+    padding-bottom: 0.45rem;
+}
+
 .stat-card {
     min-height: 145px;
 }
@@ -605,6 +642,10 @@ code {
 
     .topology-detail-card {
         min-height: auto;
+    }
+
+    .device-filter-field {
+        flex-basis: 100%;
     }
 }
 
