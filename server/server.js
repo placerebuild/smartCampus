@@ -3,6 +3,7 @@ const path = require('path');
 const { exec } = require('child_process');
 const os = require('os');
 const http = require('http');
+const dns = require('dns').promises;
 const express = require('express');
 const cors = require('cors');
 const session = require('express-session');
@@ -546,6 +547,20 @@ function buildConnectivityDetails(snapshot) {
 }
 
 // Find an existing device by IP or MAC address
+// Best-effort reverse DNS lookup; most LAN hosts have no PTR record, so a
+// failure or timeout is expected and simply leaves the hostname unset.
+async function resolveHostname(ip) {
+  try {
+    const hostnames = await Promise.race([
+      dns.reverse(ip),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('reverse DNS timeout')), 800))
+    ]);
+    return Array.isArray(hostnames) && hostnames.length ? hostnames[0] : null;
+  } catch {
+    return null;
+  }
+}
+
 async function findDeviceByIpOrMac(ip, mac) {
   const [byIp] = await dbPool.execute(
     "SELECT * FROM \"DEVICE\" WHERE \"IPAddress\" = ? LIMIT 1",
@@ -611,10 +626,13 @@ async function upsertDeviceSnapshot(snapshot) {
     ? existing.Model
     : normalizeOptional(DEFAULT_DEVICE_MODEL);
   const locationId = existing && existing.LocationID ? existing.LocationID : null;
+  const hostname = status === 'Online'
+    ? (await resolveHostname(ipAddress)) || (existing ? existing.Hostname : null)
+    : (existing ? existing.Hostname : null);
 
   if (existing) {
     await dbPool.execute(
-      "UPDATE \"DEVICE\" SET \"DeviceName\" = ?, \"DeviceType\" = ?, \"IPAddress\" = ?, \"MACAddress\" = ?, \"Manufacturer\" = ?, \"Model\" = ?, \"Status\" = ?, \"LastSeen\" = ?, \"LocationID\" = ? WHERE \"DeviceID\" = ?",
+      "UPDATE \"DEVICE\" SET \"DeviceName\" = ?, \"DeviceType\" = ?, \"IPAddress\" = ?, \"MACAddress\" = ?, \"Manufacturer\" = ?, \"Model\" = ?, \"Status\" = ?, \"LastSeen\" = ?, \"LocationID\" = ?, \"Hostname\" = ? WHERE \"DeviceID\" = ?",
       [
         deviceName,
         deviceType,
@@ -625,6 +643,7 @@ async function upsertDeviceSnapshot(snapshot) {
         status,
         lastSeen,
         locationId,
+        hostname,
         existing.DeviceID
       ]
     );
@@ -634,7 +653,7 @@ async function upsertDeviceSnapshot(snapshot) {
   }
 
   const [result] = await dbPool.execute(
-    "INSERT INTO \"DEVICE\" (\"DeviceName\", \"DeviceType\", \"IPAddress\", \"MACAddress\", \"Manufacturer\", \"Model\", \"Status\", \"LastSeen\", \"LocationID\") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING \"DeviceID\" AS \"insertId\"",
+    "INSERT INTO \"DEVICE\" (\"DeviceName\", \"DeviceType\", \"IPAddress\", \"MACAddress\", \"Manufacturer\", \"Model\", \"Status\", \"LastSeen\", \"LocationID\", \"Hostname\") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING \"DeviceID\" AS \"insertId\"",
     [
       deviceName,
       deviceType,
@@ -644,7 +663,8 @@ async function upsertDeviceSnapshot(snapshot) {
       model,
       status,
       lastSeen,
-      locationId
+      locationId,
+      hostname
     ]
   );
 
@@ -669,6 +689,9 @@ async function upsertDiscoveredDevice(entry) {
     : normalizeOptional(DEFAULT_DEVICE_MANUFACTURER);
   const model = existing && existing.Model ? existing.Model : normalizeOptional(DEFAULT_DEVICE_MODEL);
   const locationId = existing && existing.LocationID ? existing.LocationID : null;
+  const hostname = status === 'Online'
+    ? (await resolveHostname(entry.ip)) || (existing ? existing.Hostname : null)
+    : (existing ? existing.Hostname : null);
 
   const snapshot = {
     icmp: { ok: true, alive: status === 'Online', timeMs: entry.timeMs !== undefined ? entry.timeMs : null },
@@ -678,7 +701,7 @@ async function upsertDiscoveredDevice(entry) {
 
   if (existing) {
     await dbPool.execute(
-      "UPDATE \"DEVICE\" SET \"DeviceName\" = ?, \"DeviceType\" = ?, \"IPAddress\" = ?, \"MACAddress\" = ?, \"Manufacturer\" = ?, \"Model\" = ?, \"Status\" = ?, \"LastSeen\" = ?, \"LocationID\" = ? WHERE \"DeviceID\" = ?",
+      "UPDATE \"DEVICE\" SET \"DeviceName\" = ?, \"DeviceType\" = ?, \"IPAddress\" = ?, \"MACAddress\" = ?, \"Manufacturer\" = ?, \"Model\" = ?, \"Status\" = ?, \"LastSeen\" = ?, \"LocationID\" = ?, \"Hostname\" = ? WHERE \"DeviceID\" = ?",
       [
         deviceName,
         deviceType,
@@ -689,16 +712,17 @@ async function upsertDiscoveredDevice(entry) {
         status,
         lastSeen,
         locationId,
+        hostname,
         existing.DeviceID
       ]
     );
 
     await insertDeviceLog(existing.DeviceID, snapshot, status, entry.ip);
-    return existing.DeviceID;
+    return { deviceId: existing.DeviceID, isNew: false };
   }
 
   const [result] = await dbPool.execute(
-    "INSERT INTO \"DEVICE\" (\"DeviceName\", \"DeviceType\", \"IPAddress\", \"MACAddress\", \"Manufacturer\", \"Model\", \"Status\", \"LastSeen\", \"LocationID\") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING \"DeviceID\" AS \"insertId\"",
+    "INSERT INTO \"DEVICE\" (\"DeviceName\", \"DeviceType\", \"IPAddress\", \"MACAddress\", \"Manufacturer\", \"Model\", \"Status\", \"LastSeen\", \"LocationID\", \"Hostname\") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING \"DeviceID\" AS \"insertId\"",
     [
       deviceName,
       deviceType,
@@ -708,12 +732,13 @@ async function upsertDiscoveredDevice(entry) {
       model,
       status,
       lastSeen,
-      locationId
+      locationId,
+      hostname
     ]
   );
 
   await insertDeviceLog(result.insertId, snapshot, status, entry.ip);
-  return result.insertId;
+  return { deviceId: result.insertId, isNew: true };
 }
 
 // Persist or re-activate a router → endpoint link in DEVICE_CONNECTION
@@ -770,6 +795,7 @@ function mapDeviceRow(row) {
     type: row.DeviceType,
     ip: row.IPAddress,
     mac: row.MACAddress,
+    hostname: row.Hostname || '',
     status: row.Status,
     lastSeen: row.LastSeen,
     location: formatLocationLabel(row),
@@ -777,6 +803,19 @@ function mapDeviceRow(row) {
     floor: row.Floor || '',
     room: row.Room || ''
   };
+}
+
+// Shared device list query, reused by GET /api/devices, the Socket.IO devices:update
+// broadcast, and the Supabase Realtime SSE relay so every consumer renders the same shape.
+async function getMappedDevices() {
+  const [rows] = await dbPool.execute(
+    `SELECT d."DeviceID", d."DeviceName", d."DeviceType", d."IPAddress", d."MACAddress", d."Hostname",
+            d."Status", d."LastSeen", l."BuildingName", l."Floor", l."Room"
+     FROM "DEVICE" d
+     LEFT JOIN "LOCATION" l ON l."LocationID" = d."LocationID"
+     ORDER BY d."LastSeen" DESC NULLS LAST, d."DeviceID" DESC`
+  );
+  return rows.map(mapDeviceRow);
 }
 
 // Map DB rows into topology payloads
@@ -971,14 +1010,7 @@ async function emitTopologyUpdate(reason, connectedEntries) {
 // Broadcast the full device list so the Device Inventory table refreshes in real time
 async function emitDevicesUpdate() {
   try {
-    const [rows] = await dbPool.execute(
-      `SELECT d."DeviceID", d."DeviceName", d."DeviceType", d."IPAddress", d."MACAddress",
-              d."Status", d."LastSeen", l."BuildingName", l."Floor", l."Room"
-       FROM "DEVICE" d
-       LEFT JOIN "LOCATION" l ON l."LocationID" = d."LocationID"
-       ORDER BY d."LastSeen" DESC NULLS LAST, d."DeviceID" DESC`
-    );
-    io.emit('devices:update', rows.map(mapDeviceRow));
+    io.emit('devices:update', await getMappedDevices());
   } catch (err) {
     console.error('emitDevicesUpdate error:', err);
   }
@@ -1301,8 +1333,11 @@ async function discoverNetworkDevices(cidrOverride) {
   // Separating connection state from device state ensures the topology map
   // reflects both the link loss and the device status independently.
   const seenEndpointIds = [];
+  let newCount = 0;
   for (const entry of entries) {
-    const deviceId = await upsertDiscoveredDevice(entry);
+    const upserted = await upsertDiscoveredDevice(entry);
+    const deviceId = upserted ? upserted.deviceId : null;
+    if (upserted && upserted.isNew) newCount++;
     if (deviceId && routerDeviceId && deviceId !== routerDeviceId) {
       await upsertDeviceConnection(routerDeviceId, deviceId);
       seenEndpointIds.push(deviceId);
@@ -1352,8 +1387,57 @@ async function discoverNetworkDevices(cidrOverride) {
     ok: true,
     cidr,
     discovered: entries,
-    aliveCount: aliveMap.size
+    aliveCount: aliveMap.size,
+    newCount
   };
+}
+
+// ---- SCAN_SESSION bookkeeping ----
+// Records each discovery run (manual or scheduled) so the Live Scanning UI can show
+// scan state/history, including on the read-only cloud dashboard where scans can't be
+// triggered directly.
+async function startScanSession({ triggerType, userId, cidr }) {
+  const [result] = await dbPool.execute(
+    "INSERT INTO \"SCAN_SESSION\" (\"TriggerType\", \"TriggeredByUserID\", \"Cidr\") VALUES (?, ?, ?) RETURNING \"ScanSessionID\" AS \"insertId\"",
+    [triggerType, userId || null, normalizeOptional(cidr)]
+  );
+  return result.insertId;
+}
+
+async function completeScanSession(scanSessionId, { devicesFound, newDevices }) {
+  if (!scanSessionId) return;
+  await dbPool.execute(
+    "UPDATE \"SCAN_SESSION\" SET \"Status\" = 'completed', \"CompletedAt\" = ?, \"DevicesFound\" = ?, \"NewDevices\" = ? WHERE \"ScanSessionID\" = ?",
+    [new Date(), devicesFound, newDevices, scanSessionId]
+  );
+}
+
+async function failScanSession(scanSessionId, errorMessage) {
+  if (!scanSessionId) return;
+  await dbPool.execute(
+    "UPDATE \"SCAN_SESSION\" SET \"Status\" = 'failed', \"CompletedAt\" = ?, \"ErrorMessage\" = ? WHERE \"ScanSessionID\" = ?",
+    [new Date(), String(errorMessage || 'Unknown error').slice(0, 500), scanSessionId]
+  );
+}
+
+// Runs a discovery scan wrapped in a SCAN_SESSION record for history/auditing.
+async function runTrackedDiscoveryScan(cidrOverride, { triggerType, userId }) {
+  const scanSessionId = await startScanSession({ triggerType, userId, cidr: cidrOverride });
+  try {
+    const result = await discoverNetworkDevices(cidrOverride);
+    if (!result.ok) {
+      await failScanSession(scanSessionId, result.error);
+      return { ...result, scanSessionId };
+    }
+    await completeScanSession(scanSessionId, {
+      devicesFound: result.discovered.length,
+      newDevices: result.newCount
+    });
+    return { ...result, scanSessionId };
+  } catch (error) {
+    await failScanSession(scanSessionId, error.message);
+    throw error;
+  }
 }
 
 // ================== Automated Monitoring Scheduler ==================
@@ -1459,7 +1543,7 @@ async function runScheduledDiscoveryScan() {
 
   try {
     // Execute discovery across the resolved subnet
-    const result = await discoverNetworkDevices();
+    const result = await runTrackedDiscoveryScan(undefined, { triggerType: 'scheduled' });
     if (!result.ok) {
       console.warn('Scheduled discovery scan failed:', result.error || 'Unknown error');
       return;
@@ -1950,24 +2034,7 @@ app.post('/api/auth/logout', (req, res) => {
 // List devices for dashboard and inventory views
 app.get('/api/devices', requireAuth, async (req, res) => {
   try {
-    const [rows] = await dbPool.execute(`
-      SELECT
-        d."DeviceID",
-        d."DeviceName",
-        d."DeviceType",
-        d."IPAddress",
-        d."MACAddress",
-        d."Status",
-        d."LastSeen",
-        l."BuildingName",
-        l."Floor",
-        l."Room"
-      FROM "DEVICE" d
-      LEFT JOIN "LOCATION" l ON l."LocationID" = d."LocationID"
-      ORDER BY d."LastSeen" DESC NULLS LAST, d."DeviceID" DESC
-    `);
-
-    return res.json(rows.map(mapDeviceRow));
+    return res.json(await getMappedDevices());
   } catch (error) {
     console.error('Devices load error:', error);
     return res.status(500).json({ error: 'Unable to load devices right now.' });
@@ -2254,6 +2321,67 @@ app.get('/api/topology', requireAuth, async (req, res) => {
   }
 });
 
+// Server-relayed Supabase Realtime: subscribes to Postgres changes with the service-role
+// admin client (never exposed to the browser) and forwards them to already-authenticated
+// dashboard sessions over Server-Sent Events. This is what lets the cloud (Vercel)
+// dashboard update without a manual refresh — Socket.IO can't hold a persistent
+// connection there (see the CLOUD_MODE gate above), but a streamed HTTP response can for
+// the lifetime of one serverless invocation, and EventSource reconnects natively.
+const SSE_HEARTBEAT_MS = 20000;
+const SSE_MAX_LIFETIME_MS = 50000; // stay under Vercel's configured 60s maxDuration
+const SSE_DEVICE_DEBOUNCE_MS = 300; // coalesce bursts (one scan can touch many rows)
+
+app.get('/api/events/stream', requireAuth, async (req, res) => {
+  const supabaseAdmin = req.app.locals.supabaseAdmin;
+  if (!supabaseAdmin) {
+    return res.status(503).json({ error: 'Realtime relay is not configured.' });
+  }
+
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache, no-transform',
+    Connection: 'keep-alive',
+    'X-Accel-Buffering': 'no'
+  });
+  res.flushHeaders();
+
+  const send = (event, data) => {
+    res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+  };
+  send('connected', { time: new Date().toISOString() });
+
+  let deviceDebounceTimer = null;
+  const scheduleDeviceBroadcast = () => {
+    if (deviceDebounceTimer) return;
+    deviceDebounceTimer = setTimeout(async () => {
+      deviceDebounceTimer = null;
+      try {
+        send('devices', await getMappedDevices());
+      } catch (error) {
+        console.error('SSE device broadcast error:', error);
+      }
+    }, SSE_DEVICE_DEBOUNCE_MS);
+  };
+
+  const channel = supabaseAdmin
+    .channel(`device-events-${req.sessionID}-${Date.now()}`)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'DEVICE' }, scheduleDeviceBroadcast)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'ALERT' }, () => send('alert', { time: new Date().toISOString() }))
+    .subscribe();
+
+  const heartbeat = setInterval(() => res.write(': ping\n\n'), SSE_HEARTBEAT_MS);
+  const lifetimeTimer = setTimeout(() => { cleanup(); res.end(); }, SSE_MAX_LIFETIME_MS);
+
+  function cleanup() {
+    clearInterval(heartbeat);
+    clearTimeout(lifetimeTimer);
+    if (deviceDebounceTimer) clearTimeout(deviceDebounceTimer);
+    supabaseAdmin.removeChannel(channel);
+  }
+
+  req.on('close', cleanup);
+});
+
 // Get current scanning status (Admin only)
 app.get('/api/settings/scanning', requireAuth, (req, res) => {
   return res.json({ enabled: scanningEnabled, available: !CLOUD_MODE });
@@ -2279,7 +2407,10 @@ app.post('/api/monitor/discover', requireAuth, requireRole('Admin'), async (req,
   const cidrOverride = typeof req.body?.cidr === 'string' ? req.body.cidr.trim() : '';
 
   try {
-    const result = await discoverNetworkDevices(cidrOverride || undefined);
+    const result = await runTrackedDiscoveryScan(cidrOverride || undefined, {
+      triggerType: 'manual',
+      userId: req.session.user.userId
+    });
     if (!result.ok) {
       return res.status(400).json({ error: result.error || 'Discovery failed.' });
     }
@@ -2290,6 +2421,39 @@ app.post('/api/monitor/discover', requireAuth, requireRole('Admin'), async (req,
   } catch (error) {
     console.error('Discovery error:', error);
     return res.status(500).json({ error: 'Unable to scan network right now.' });
+  }
+});
+
+// Recent discovery scan runs — used by the Live Scanning panel to show scan state/history
+app.get('/api/scan-sessions', requireAuth, async (req, res) => {
+  const limit = Math.min(Number(req.query.limit) || 10, 100);
+  if (!Number.isFinite(limit)) {
+    return res.status(400).json({ error: 'Invalid limit.' });
+  }
+
+  try {
+    const [rows] = await dbPool.execute(
+      `SELECT "ScanSessionID", "TriggerType", "Cidr", "Status", "StartedAt", "CompletedAt",
+              "DevicesFound", "NewDevices", "ErrorMessage"
+       FROM "SCAN_SESSION"
+       ORDER BY "StartedAt" DESC
+       LIMIT ?`,
+      [limit]
+    );
+    return res.json(rows.map(row => ({
+      id: row.ScanSessionID,
+      triggerType: row.TriggerType,
+      cidr: row.Cidr,
+      status: row.Status,
+      startedAt: row.StartedAt,
+      completedAt: row.CompletedAt,
+      devicesFound: row.DevicesFound,
+      newDevices: row.NewDevices,
+      errorMessage: row.ErrorMessage
+    })));
+  } catch (error) {
+    console.error('Scan session load error:', error);
+    return res.status(500).json({ error: 'Unable to load scan history right now.' });
   }
 });
 

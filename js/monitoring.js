@@ -11,6 +11,9 @@ let monitoringEnabledCache = null;
 let monitoringEnabledCachedAt = 0;
 const MONITORING_CACHE_TTL_MS = 60000;
 
+let realtimeEventSource = null;
+window.__scRealtimeConnected = false;
+
 async function resolveMonitoringEnabled() {
     const now = Date.now();
     if (monitoringEnabledCache !== null && (now - monitoringEnabledCachedAt) < MONITORING_CACHE_TTL_MS) {
@@ -152,11 +155,75 @@ function updateUiFromDevices(devices) {
     updateDashboardMetrics(devices.length, onlineCount, offlineCount, unknownCount, devices);
 }
 
+async function refreshAlertsIfPossible() {
+    if (typeof populateAlertsTable === 'function') {
+        // alerts.html — already re-fetches /api/alerts and re-renders the table.
+        populateAlertsTable();
+        return;
+    }
+    if (typeof setAlertsData === 'function' && typeof populateRecentAlerts === 'function') {
+        // Dashboard's "recent alerts" widget — fetch once, then re-render with existing helpers.
+        try {
+            const response = await fetch(`${MONITOR_API_BASE}/api/alerts`, { credentials: 'include' });
+            const alerts = await handleApiError(response, 'Alerts request failed.');
+            if (Array.isArray(alerts)) {
+                setAlertsData(alerts);
+                populateRecentAlerts();
+            }
+        } catch (error) {
+            console.warn('Alert refresh failed:', error.message || error);
+        }
+    }
+}
+
+// Supabase Realtime, relayed to the browser over Server-Sent Events (see
+// GET /api/events/stream in server/server.js). Socket.IO can't hold a persistent
+// connection on Vercel serverless, so the cloud dashboard uses this instead; the local
+// (campus) instance keeps using Socket.IO unchanged. Purely additive: the 15s poll cycle
+// above keeps running regardless, so a blocked/unsupported EventSource just falls back
+// to polling with no functional loss.
+function startRealtimeEvents() {
+    if (!window.SMARTCAMPUS_CLOUD || typeof EventSource !== 'function') return;
+    if (realtimeEventSource) return;
+
+    realtimeEventSource = new EventSource(`${MONITOR_API_BASE}/api/events/stream`, { withCredentials: true });
+
+    realtimeEventSource.addEventListener('open', () => {
+        window.__scRealtimeConnected = true;
+    });
+
+    realtimeEventSource.addEventListener('error', () => {
+        window.__scRealtimeConnected = false;
+        // EventSource reconnects automatically; nothing else to do here.
+    });
+
+    realtimeEventSource.addEventListener('devices', (event) => {
+        try {
+            updateUiFromDevices(JSON.parse(event.data));
+        } catch (error) {
+            console.warn('Realtime device update failed:', error.message || error);
+        }
+    });
+
+    realtimeEventSource.addEventListener('alert', () => {
+        refreshAlertsIfPossible();
+    });
+}
+
 function shouldStartMonitoring() {
     return Boolean(
         document.getElementById('devices-table') ||
         document.getElementById('statusChart') ||
         document.getElementById('total-devices')
+    );
+}
+
+// Broader than shouldStartMonitoring(): also covers alerts.html, which has no device
+// table/stat tiles but still needs the 'alert' realtime channel (see refreshAlertsIfPossible).
+function shouldStartRealtimeEvents() {
+    return shouldStartMonitoring() || Boolean(
+        document.getElementById('alerts-table') ||
+        document.getElementById('recent-alerts')
     );
 }
 
@@ -200,5 +267,8 @@ async function startMonitoring() {
 window.addEventListener('load', () => {
     if (shouldStartMonitoring()) {
         startMonitoring();
+    }
+    if (shouldStartRealtimeEvents()) {
+        startRealtimeEvents();
     }
 });

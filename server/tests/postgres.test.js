@@ -33,7 +33,7 @@ test('schema migration is tracked, repeatable, and refuses untracked existing ta
     await db.exec('DROP TABLE "USERS";');
     await migrate(pool);
     await migrate(pool);
-    assert.equal((await db.query('SELECT count(*) AS n FROM smartcampus_migrations')).rows[0].n, 2);
+    assert.equal((await db.query('SELECT count(*) AS n FROM smartcampus_migrations')).rows[0].n, 3);
   } finally { await db.close(); }
 });
 
@@ -44,6 +44,9 @@ test('schema, all backend queries, relational integrity, analytics and RLS', asy
     const schema = fs.readFileSync(path.join(__dirname, '..', 'migrations', '001_supabase.sql'), 'utf8');
     await db.exec(schema);
     await db.exec(schema);
+    const realtimeSchema = fs.readFileSync(path.join(__dirname, '..', 'migrations', '003_realtime.sql'), 'utf8');
+    await db.exec(realtimeSchema);
+    await db.exec(realtimeSchema);
 
     // Parse actual application SQL so new or missed query variants fail validation.
     const source = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');

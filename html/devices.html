@@ -29,6 +29,19 @@
         <h5 class="section-heading">Device Inventory</h5>
         <p class="text-muted mb-3">Campus network devices (IC Building for now). Data will be loaded from the database
             once the device list is provided.</p>
+        <div class="card panel-card p-3 mb-3" id="live-scan-panel">
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <div>
+                    <h6 class="section-title mb-1">Live Scanning</h6>
+                    <span id="scan-state-text" class="small fw-semibold scan-state-pill scan-state-pill--idle">Ready</span>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <span id="scan-realtime-indicator" class="status-pill scan-realtime-pill"><i class="fas fa-circle"></i> Live</span>
+                    <button id="start-scan-btn" class="btn btn-primary btn-sm" type="button"><i class="fas fa-satellite-dish me-1"></i>Start Live Scan</button>
+                </div>
+            </div>
+            <div id="scan-summary" class="small text-muted mt-2"></div>
+        </div>
         <div class="card panel-card p-3">
             <div class="table-responsive">
                 <table class="table table-hover align-middle" id="devices-table">
@@ -55,6 +68,7 @@
     <script src="https://cdn.jsdelivr.net/npm/socket.io-client@4.7.5/dist/socket.io.min.js"></script>
     <script src="../js/script.js"></script>
     <script src="../js/monitoring.js"></script>
+    <script src="../js/live-scan.js"></script>
     <script type="module" src="../js/auth.js"></script>
 </body>
 

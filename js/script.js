@@ -143,6 +143,7 @@ function openDeviceDetailsModal(device) {
     const type = escapeHtml(formatDeviceValue(selected.type));
     const ip = escapeHtml(formatDeviceValue(selected.ip));
     const mac = escapeHtml(formatDeviceValue(selected.mac));
+    const hostname = escapeHtml(formatDeviceValue(selected.hostname));
     const location = escapeHtml(formatDeviceValue(resolveLocationLabel(selected)));
     const building = escapeHtml(formatDeviceValue(selected.building));
     const floor = escapeHtml(formatDeviceValue(selected.floor));
@@ -183,6 +184,7 @@ function openDeviceDetailsModal(device) {
                                 <li><span class="device-detail-label">Type</span><span data-device-field="type">${type}</span></li>
                                 <li><span class="device-detail-label">IP Address</span><code>${ip}</code></li>
                                 <li><span class="device-detail-label">MAC Address</span><span>${mac}</span></li>
+                                <li><span class="device-detail-label">Hostname</span><span data-device-field="hostname">${hostname}</span></li>
                                 <li><span class="device-detail-label">Location</span><span data-device-field="location">${location}</span></li>
                                 <li><span class="device-detail-label">Building</span><span data-device-field="building">${building}</span></li>
                                 <li><span class="device-detail-label">Floor</span><span data-device-field="floor">${floor}</span></li>

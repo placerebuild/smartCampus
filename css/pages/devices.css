@@ -341,6 +341,52 @@ body.sidebar-layout {
     background: linear-gradient(145deg, #f09a35 0%, #f9b86a 100%);
 }
 
+.scan-state-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    border-radius: 999px;
+    padding: 0.28rem 0.7rem;
+    font-size: 0.82rem;
+}
+
+.scan-state-pill--idle {
+    background: #eef2f7;
+    color: #4f6681;
+}
+
+.scan-state-pill--scanning {
+    background: #e8f1ff;
+    color: #1f5cb0;
+}
+
+.scan-state-pill--ok {
+    background: #e6faef;
+    color: #198c59;
+}
+
+.scan-state-pill--warn {
+    background: #fff3e0;
+    color: #b3690e;
+}
+
+.scan-state-pill--error {
+    background: #fdeceb;
+    color: #b23a33;
+}
+
+.scan-realtime-pill {
+    background: #eef2f7;
+    color: #6c7f95;
+    border-color: #d9e6f4;
+}
+
+.scan-realtime-pill--connected {
+    background: #e6faef;
+    color: #198c59;
+    border-color: #bfeccf;
+}
+
 #recent-alerts .list-group-item {
     background: transparent;
     border-color: #e5eef8;
