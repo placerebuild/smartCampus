@@ -118,3 +118,7 @@ Recovery messages are sent only when Stage 2 or higher was reached.
 | `claude-api` | Anthropic SDK usage, model selection, prompt design |
 | `vercel` | Cloud deployment, environment variables, `CLOUD_MODE` |
 | `openai` | Adding OpenAI integration to the AI layer |
+| `alerts-email` | Three-stage severity pipeline, `insertAlert`, `sendAlertEmail`, SMTP config, email cooldowns |
+| `analytics-ai-insights` | `GET /api/analytics/*` routes, `parsePeriod`, Gemini/Anthropic dual-provider AI insights |
+| `topology-socketio` | `fetchTopologyPayload`, Socket.IO event contract, node/link shape, `emitTopologyUpdate` |
+| `frontend-conventions` | New pages, auth guards, sidebar wiring, fetch conventions, CDN dependencies |
