@@ -1,565 +1,350 @@
-Continuous ping sweep error: Error: Connection terminated due to connection timeout
-    at C:\Projects\smartCampus\server\node_modules\pg-pool\index.js:45:11
+analytics/ai-insights error: GoogleGenerativeAIFetchError: [GoogleGenerativeAI Error]: Error fetching from https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent: [503 Service Unavailable] This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.
+    at handleResponseNotOk (C:\Projects\smartCampus\server\node_modules\@google\generative-ai\dist\index.js:434:11)
     at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
-    at async Object.execute (C:\Projects\smartCampus\server\postgres.js:39:22)
-    at async Timeout.runContinuousPingSweep [as _onTimeout] (C:\Projects\smartCampus\server\server.js:1484:20) {
-  [cause]: Error: Connection terminated unexpectedly
-      at Connection.<anonymous> (C:\Projects\smartCampus\server\node_modules\pg\lib\client.js:204:73)
-      at Object.onceWrapper (node:events:622:28)
-      at Connection.emit (node:events:508:28)
-      at Socket.<anonymous> (C:\Projects\smartCampus\server\node_modules\pg\lib\connection.js:64:12)
-      at Socket.emit (node:events:520:35)
-      at TCP.<anonymous> (node:net:346:12)
+    at async makeRequest (C:\Projects\smartCampus\server\node_modules\@google\generative-ai\dist\index.js:403:9)
+    at async generateContent (C:\Projects\smartCampus\server\node_modules\@google\generative-ai\dist\index.js:867:22)
+    at async C:\Projects\smartCampus\server\server.js:2888:20 {
+  status: 503,
+  statusText: 'Service Unavailable',
+  errorDetails: undefined
 }
-Continuous ping sweep error: Error: Connection terminated due to connection timeout
-    at C:\Projects\smartCampus\server\node_modules\pg-pool\index.js:45:11
-    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
-    at async Object.execute (C:\Projects\smartCampus\server\postgres.js:39:22)
-    at async Timeout.runContinuousPingSweep [as _onTimeout] (C:\Projects\smartCampus\server\server.js:1484:20) {
-  [cause]: Error: Connection terminated unexpectedly
-      at Connection.<anonymous> (C:\Projects\smartCampus\server\node_modules\pg\lib\client.js:204:73)
-      at Object.onceWrapper (node:events:622:28)
-      at Connection.emit (node:events:508:28)
-      at Socket.<anonymous> (C:\Projects\smartCampus\server\node_modules\pg\lib\connection.js:64:12)
-      at Socket.emit (node:events:520:35)
-      at TCP.<anonymous> (node:net:346:12)
-}
-Scheduled device ping sweep error: Error: timeout exceeded when trying to connect
-    at C:\Projects\smartCampus\server\node_modules\pg-pool\index.js:45:11
-    at runNextTicks (node:internal/process/task_queues:65:5)
-    at listOnTimeout (node:internal/timers:567:9)
-    at process.processTimers (node:internal/timers:541:7)
-    at async Object.execute (C:\Projects\smartCampus\server\postgres.js:39:22)
-    at async insertDeviceLog (C:\Projects\smartCampus\server\server.js:581:3)
-    at async C:\Projects\smartCampus\server\server.js:1750:7
-    at async C:\Projects\smartCampus\server\server.js:1220:31
-    at async Promise.all (index 16)
-    at async runWithConcurrency (C:\Projects\smartCampus\server\server.js:1224:3)
-Scheduled device ping sweep error: Error: timeout exceeded when trying to connect
-    at C:\Projects\smartCampus\server\node_modules\pg-pool\index.js:45:11
-    at runNextTicks (node:internal/process/task_queues:65:5)
-    at listOnTimeout (node:internal/timers:567:9)
-    at process.processTimers (node:internal/timers:541:7)
-    at async Object.execute (C:\Projects\smartCampus\server\postgres.js:39:22)
-    at async C:\Projects\smartCampus\server\server.js:1743:9
-    at async C:\Projects\smartCampus\server\server.js:1220:31
-    at async Promise.all (index 10)
-    at async runWithConcurrency (C:\Projects\smartCampus\server\server.js:1224:3)
-    at async Timeout.runScheduledDevicePingSweep [as _onTimeout] (C:\Projects\smartCampus\server\server.js:1713:5)
-Topology broadcast error: Error: timeout exceeded when trying to connect
-    at C:\Projects\smartCampus\server\node_modules\pg-pool\index.js:45:11
-    at async Object.execute (C:\Projects\smartCampus\server\postgres.js:39:22)
-    at async fetchTopologyPayload (C:\Projects\smartCampus\server\server.js:895:18)
-    at async emitTopologyUpdate (C:\Projects\smartCampus\server\server.js:960:21)
+sendAlertEmail error: Data command failed: 421-4.3.0 Temporary System Problem. Try again later. For more information, go to
+421 4.3.0  https://support.google.com/a/answer/3221692 98e67ed59e1d1-3a497ebc998sm3158757a91.2 - gsmtp
+sendAlertEmail error: Data command failed: 421-4.3.0 Temporary System Problem. Try again later. For more information, go to
+421 4.3.0  https://support.google.com/a/answer/3221692 98e67ed59e1d1-3a497718037sm3287524a91.0 - gsmtp
+sendAlertEmail error: Data command failed: 421-4.3.0 Temporary System Problem. Try again later. For more information, go to
+421 4.3.0  https://support.google.com/a/answer/3221692 d2e1a72fcca58-885e163d41bsm144276b3a.24 - gsmtp
+sendAlertEmail error: Data command failed: 421-4.3.0 Temporary System Problem. Try again later. For more information, go to
+421 4.3.0  https://support.google.com/a/answer/3221692 d2e1a72fcca58-885defda094sm151078b3a.4 - gsmtp
+sendAlertEmail error: Data command failed: 421-4.3.0 Temporary System Problem. Try again later. For more information, go to
+421 4.3.0  https://support.google.com/a/answer/3221692 d9443c01a7336-2df913ff226sm49796005ad.34 - gsmtp
 Continuous ping sweep error: Error: timeout exceeded when trying to connect
     at C:\Projects\smartCampus\server\node_modules\pg-pool\index.js:45:11
     at async Object.execute (C:\Projects\smartCampus\server\postgres.js:39:22)
-    at async Timeout.runContinuousPingSweep [as _onTimeout] (C:\Projects\smartCampus\server\server.js:1484:20)
-Scheduled discovery scan error: Error: timeout exceeded when trying to connect
-    at C:\Projects\smartCampus\server\node_modules\pg-pool\index.js:45:11
-    at runNextTicks (node:internal/process/task_queues:65:5)
-    at listOnTimeout (node:internal/timers:567:9)
-    at process.processTimers (node:internal/timers:541:7)
-    at async Object.execute (C:\Projects\smartCampus\server\postgres.js:39:22)
-    at async findDeviceByIpOrMac (C:\Projects\smartCampus\server\server.js:550:18)
-    at async upsertDiscoveredDevice (C:\Projects\smartCampus\server\server.js:660:20)
-    at async discoverNetworkDevices (C:\Projects\smartCampus\server\server.js:1305:22)
-    at async runScheduledDiscoveryScan (C:\Projects\smartCampus\server\server.js:1462:20)
+    at async Timeout.runContinuousPingSweep [as _onTimeout] (C:\Projects\smartCampus\server\server.js:1568:20)
 Scheduled device ping sweep error: Error: timeout exceeded when trying to connect
     at C:\Projects\smartCampus\server\node_modules\pg-pool\index.js:45:11
     at runNextTicks (node:internal/process/task_queues:65:5)
-    at listOnTimeout (node:internal/timers:567:9)
-    at process.processTimers (node:internal/timers:541:7)
+    at listOnTimeout (node:internal/timers:644:9)
+    at process.processTimers (node:internal/timers:618:7)
     at async Object.execute (C:\Projects\smartCampus\server\postgres.js:39:22)
-    at async C:\Projects\smartCampus\server\server.js:1743:9
-    at async C:\Projects\smartCampus\server\server.js:1220:31
-    at async Promise.all (index 15)
-    at async runWithConcurrency (C:\Projects\smartCampus\server\server.js:1224:3)
-    at async Timeout.runScheduledDevicePingSweep [as _onTimeout] (C:\Projects\smartCampus\server\server.js:1713:5)
-Scheduled router scan error: Error: timeout exceeded when trying to connect
-    at C:\Projects\smartCampus\server\node_modules\pg-pool\index.js:45:11
-    at async Object.execute (C:\Projects\smartCampus\server\postgres.js:39:22)
-    at async insertDeviceLog (C:\Projects\smartCampus\server\server.js:581:3)
-    at async upsertDeviceSnapshot (C:\Projects\smartCampus\server\server.js:632:5)
-    at async Timeout.runScheduledRouterScan [as _onTimeout] (C:\Projects\smartCampus\server\server.js:1444:5)
-Continuous ping sweep error: Error: timeout exceeded when trying to connect
-    at C:\Projects\smartCampus\server\node_modules\pg-pool\index.js:45:11
-    at async Object.execute (C:\Projects\smartCampus\server\postgres.js:39:22)
-    at async Timeout.runContinuousPingSweep [as _onTimeout] (C:\Projects\smartCampus\server\server.js:1484:20)
-Scheduled device ping sweep error: Error: timeout exceeded when trying to connect
-    at C:\Projects\smartCampus\server\node_modules\pg-pool\index.js:45:11
-    at runNextTicks (node:internal/process/task_queues:65:5)
-    at listOnTimeout (node:internal/timers:567:9)
-    at process.processTimers (node:internal/timers:541:7)
-    at async Object.execute (C:\Projects\smartCampus\server\postgres.js:39:22)
-    at async C:\Projects\smartCampus\server\server.js:1743:9
-    at async C:\Projects\smartCampus\server\server.js:1220:31
-    at async Promise.all (index 0)
-    at async runWithConcurrency (C:\Projects\smartCampus\server\server.js:1224:3)
-    at async Timeout.runScheduledDevicePingSweep [as _onTimeout] (C:\Projects\smartCampus\server\server.js:1713:5)
-Scheduled router scan error: Error: timeout exceeded when trying to connect
-    at C:\Projects\smartCampus\server\node_modules\pg-pool\index.js:45:11
-    at async Object.execute (C:\Projects\smartCampus\server\postgres.js:39:22)
-    at async findDeviceByIpOrMac (C:\Projects\smartCampus\server\server.js:550:18)
-    at async upsertDeviceSnapshot (C:\Projects\smartCampus\server\server.js:597:20)
-    at async Timeout.runScheduledRouterScan [as _onTimeout] (C:\Projects\smartCampus\server\server.js:1444:5)
-Scheduled device ping sweep error: Error: timeout exceeded when trying to connect
-    at C:\Projects\smartCampus\server\node_modules\pg-pool\index.js:45:11
-    at async Object.execute (C:\Projects\smartCampus\server\postgres.js:39:22)
-    at async Timeout.runScheduledDevicePingSweep [as _onTimeout] (C:\Projects\smartCampus\server\server.js:1707:20)
-Scheduled device ping sweep error: Error: timeout exceeded when trying to connect
-    at C:\Projects\smartCampus\server\node_modules\pg-pool\index.js:45:11
-    at async Object.execute (C:\Projects\smartCampus\server\postgres.js:39:22)
-    at async Timeout.runScheduledDevicePingSweep [as _onTimeout] (C:\Projects\smartCampus\server\server.js:1707:20)
-Scheduled discovery scan error: error: duplicate key value violates unique constraint "DEVICE_MACAddress_key"
-    at C:\Projects\smartCampus\server\node_modules\pg-pool\index.js:45:11
-    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
-    at async Object.execute (C:\Projects\smartCampus\server\postgres.js:39:22)
-    at async upsertDiscoveredDevice (C:\Projects\smartCampus\server\server.js:680:5)
-    at async discoverNetworkDevices (C:\Projects\smartCampus\server\server.js:1305:22)
-    at async Timeout.runScheduledDiscoveryScan [as _onTimeout] (C:\Projects\smartCampus\server\server.js:1462:20) {
-  length: 229,
-  severity: 'ERROR',
-  code: '23505',
-  detail: 'Key ("MACAddress")=(7e-68-e5-fd-9e-b4) already exists.',
-  hint: undefined,
-  position: undefined,
-  internalPosition: undefined,
-  internalQuery: undefined,
-  where: undefined,
-  schema: 'public',
-  table: 'DEVICE',
-  column: undefined,
-  dataType: undefined,
-  constraint: 'DEVICE_MACAddress_key',
-  file: 'nbtinsert.c',
-  line: '666',
-  routine: '_bt_check_unique'
-}
-Scheduled discovery scan error: error: duplicate key value violates unique constraint "DEVICE_MACAddress_key"
-    at C:\Projects\smartCampus\server\node_modules\pg-pool\index.js:45:11
-    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
-    at async Object.execute (C:\Projects\smartCampus\server\postgres.js:39:22)
-    at async upsertDiscoveredDevice (C:\Projects\smartCampus\server\server.js:680:5)
-    at async discoverNetworkDevices (C:\Projects\smartCampus\server\server.js:1305:22)
-    at async Timeout.runScheduledDiscoveryScan [as _onTimeout] (C:\Projects\smartCampus\server\server.js:1462:20) {
-  length: 229,
-  severity: 'ERROR',
-  code: '23505',
-  detail: 'Key ("MACAddress")=(7e-68-e5-fd-9e-b4) already exists.',
-  hint: undefined,
-  position: undefined,
-  internalPosition: undefined,
-  internalQuery: undefined,
-  where: undefined,
-  schema: 'public',
-  table: 'DEVICE',
-  column: undefined,
-  dataType: undefined,
-  constraint: 'DEVICE_MACAddress_key',
-  file: 'nbtinsert.c',
-  line: '666',
-  routine: '_bt_check_unique'
-}
-Scheduled discovery scan error: error: duplicate key value violates unique constraint "DEVICE_MACAddress_key"
-    at C:\Projects\smartCampus\server\node_modules\pg-pool\index.js:45:11
-    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
-    at async Object.execute (C:\Projects\smartCampus\server\postgres.js:39:22)
-    at async upsertDiscoveredDevice (C:\Projects\smartCampus\server\server.js:680:5)
-    at async discoverNetworkDevices (C:\Projects\smartCampus\server\server.js:1305:22)
-    at async Timeout.runScheduledDiscoveryScan [as _onTimeout] (C:\Projects\smartCampus\server\server.js:1462:20) {
-  length: 229,
-  severity: 'ERROR',
-  code: '23505',
-  detail: 'Key ("MACAddress")=(7e-68-e5-fd-9e-b4) already exists.',
-  hint: undefined,
-  position: undefined,
-  internalPosition: undefined,
-  internalQuery: undefined,
-  where: undefined,
-  schema: 'public',
-  table: 'DEVICE',
-  column: undefined,
-  dataType: undefined,
-  constraint: 'DEVICE_MACAddress_key',
-  file: 'nbtinsert.c',
-  line: '666',
-  routine: '_bt_check_unique'
-}
-Scheduled discovery scan error: error: duplicate key value violates unique constraint "DEVICE_MACAddress_key"
-    at C:\Projects\smartCampus\server\node_modules\pg-pool\index.js:45:11
-    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
-    at async Object.execute (C:\Projects\smartCampus\server\postgres.js:39:22)
-    at async upsertDiscoveredDevice (C:\Projects\smartCampus\server\server.js:680:5)
-    at async discoverNetworkDevices (C:\Projects\smartCampus\server\server.js:1305:22)
-    at async Timeout.runScheduledDiscoveryScan [as _onTimeout] (C:\Projects\smartCampus\server\server.js:1462:20) {
-  length: 229,
-  severity: 'ERROR',
-  code: '23505',
-  detail: 'Key ("MACAddress")=(7e-68-e5-fd-9e-b4) already exists.',
-  hint: undefined,
-  position: undefined,
-  internalPosition: undefined,
-  internalQuery: undefined,
-  where: undefined,
-  schema: 'public',
-  table: 'DEVICE',
-  column: undefined,
-  dataType: undefined,
-  constraint: 'DEVICE_MACAddress_key',
-  file: 'nbtinsert.c',
-  line: '666',
-  routine: '_bt_check_unique'
-}
-Scheduled discovery scan error: error: duplicate key value violates unique constraint "DEVICE_MACAddress_key"
-    at C:\Projects\smartCampus\server\node_modules\pg-pool\index.js:45:11
-    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
-    at async Object.execute (C:\Projects\smartCampus\server\postgres.js:39:22)
-    at async upsertDiscoveredDevice (C:\Projects\smartCampus\server\server.js:680:5)
-    at async discoverNetworkDevices (C:\Projects\smartCampus\server\server.js:1305:22)
-    at async Timeout.runScheduledDiscoveryScan [as _onTimeout] (C:\Projects\smartCampus\server\server.js:1462:20) {
-  length: 229,
-  severity: 'ERROR',
-  code: '23505',
-  detail: 'Key ("MACAddress")=(7e-68-e5-fd-9e-b4) already exists.',
-  hint: undefined,
-  position: undefined,
-  internalPosition: undefined,
-  internalQuery: undefined,
-  where: undefined,
-  schema: 'public',
-  table: 'DEVICE',
-  column: undefined,
-  dataType: undefined,
-  constraint: 'DEVICE_MACAddress_key',
-  file: 'nbtinsert.c',
-  line: '666',
-  routine: '_bt_check_unique'
-}
-Scheduled discovery scan error: error: duplicate key value violates unique constraint "DEVICE_MACAddress_key"
-    at C:\Projects\smartCampus\server\node_modules\pg-pool\index.js:45:11
-    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
-    at async Object.execute (C:\Projects\smartCampus\server\postgres.js:39:22)
-    at async upsertDiscoveredDevice (C:\Projects\smartCampus\server\server.js:680:5)
-    at async discoverNetworkDevices (C:\Projects\smartCampus\server\server.js:1305:22)
-    at async Timeout.runScheduledDiscoveryScan [as _onTimeout] (C:\Projects\smartCampus\server\server.js:1462:20) {
-  length: 229,
-  severity: 'ERROR',
-  code: '23505',
-  detail: 'Key ("MACAddress")=(7e-68-e5-fd-9e-b4) already exists.',
-  hint: undefined,
-  position: undefined,
-  internalPosition: undefined,
-  internalQuery: undefined,
-  where: undefined,
-  schema: 'public',
-  table: 'DEVICE',
-  column: undefined,
-  dataType: undefined,
-  constraint: 'DEVICE_MACAddress_key',
-  file: 'nbtinsert.c',
-  line: '666',
-  routine: '_bt_check_unique'
-}
-Scheduled discovery scan error: error: duplicate key value violates unique constraint "DEVICE_MACAddress_key"
-    at C:\Projects\smartCampus\server\node_modules\pg-pool\index.js:45:11
-    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
-    at async Object.execute (C:\Projects\smartCampus\server\postgres.js:39:22)
-    at async upsertDiscoveredDevice (C:\Projects\smartCampus\server\server.js:680:5)
-    at async discoverNetworkDevices (C:\Projects\smartCampus\server\server.js:1305:22)
-    at async Timeout.runScheduledDiscoveryScan [as _onTimeout] (C:\Projects\smartCampus\server\server.js:1462:20) {
-  length: 229,
-  severity: 'ERROR',
-  code: '23505',
-  detail: 'Key ("MACAddress")=(7e-68-e5-fd-9e-b4) already exists.',
-  hint: undefined,
-  position: undefined,
-  internalPosition: undefined,
-  internalQuery: undefined,
-  where: undefined,
-  schema: 'public',
-  table: 'DEVICE',
-  column: undefined,
-  dataType: undefined,
-  constraint: 'DEVICE_MACAddress_key',
-  file: 'nbtinsert.c',
-  line: '666',
-  routine: '_bt_check_unique'
-}
-Scheduled discovery scan error: error: duplicate key value violates unique constraint "DEVICE_MACAddress_key"
-    at C:\Projects\smartCampus\server\node_modules\pg-pool\index.js:45:11
-    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
-    at async Object.execute (C:\Projects\smartCampus\server\postgres.js:39:22)
-    at async upsertDiscoveredDevice (C:\Projects\smartCampus\server\server.js:680:5)
-    at async discoverNetworkDevices (C:\Projects\smartCampus\server\server.js:1305:22)
-    at async Timeout.runScheduledDiscoveryScan [as _onTimeout] (C:\Projects\smartCampus\server\server.js:1462:20) {
-  length: 229,
-  severity: 'ERROR',
-  code: '23505',
-  detail: 'Key ("MACAddress")=(7e-68-e5-fd-9e-b4) already exists.',
-  hint: undefined,
-  position: undefined,
-  internalPosition: undefined,
-  internalQuery: undefined,
-  where: undefined,
-  schema: 'public',
-  table: 'DEVICE',
-  column: undefined,
-  dataType: undefined,
-  constraint: 'DEVICE_MACAddress_key',
-  file: 'nbtinsert.c',
-  line: '666',
-  routine: '_bt_check_unique'
-}
-Scheduled device ping sweep error: Error: timeout exceeded when trying to connect
-    at C:\Projects\smartCampus\server\node_modules\pg-pool\index.js:45:11
-    at runNextTicks (node:internal/process/task_queues:65:5)
-    at listOnTimeout (node:internal/timers:567:9)
-    at process.processTimers (node:internal/timers:541:7)
-    at async Object.execute (C:\Projects\smartCampus\server\postgres.js:39:22)
-    at async C:\Projects\smartCampus\server\server.js:1743:9
-    at async C:\Projects\smartCampus\server\server.js:1220:31
-    at async Promise.all (index 11)
-    at async runWithConcurrency (C:\Projects\smartCampus\server\server.js:1224:3)
-    at async Timeout.runScheduledDevicePingSweep [as _onTimeout] (C:\Projects\smartCampus\server\server.js:1713:5)
-Scheduled router scan error: Error: timeout exceeded when trying to connect
-    at C:\Projects\smartCampus\server\node_modules\pg-pool\index.js:45:11
-    at async Object.execute (C:\Projects\smartCampus\server\postgres.js:39:22)
-    at async findDeviceByIpOrMac (C:\Projects\smartCampus\server\server.js:550:18)
-    at async upsertDeviceSnapshot (C:\Projects\smartCampus\server\server.js:597:20)
-    at async Timeout.runScheduledRouterScan [as _onTimeout] (C:\Projects\smartCampus\server\server.js:1444:5)
-Scheduled device ping sweep error: Error: timeout exceeded when trying to connect
-    at C:\Projects\smartCampus\server\node_modules\pg-pool\index.js:45:11
-    at runNextTicks (node:internal/process/task_queues:65:5)
-    at listOnTimeout (node:internal/timers:567:9)
-    at process.processTimers (node:internal/timers:541:7)
-    at async Object.execute (C:\Projects\smartCampus\server\postgres.js:39:22)
-    at async C:\Projects\smartCampus\server\server.js:1743:9
-    at async C:\Projects\smartCampus\server\server.js:1220:31
-    at async Promise.all (index 7)
-    at async runWithConcurrency (C:\Projects\smartCampus\server\server.js:1224:3)
-    at async Timeout.runScheduledDevicePingSweep [as _onTimeout] (C:\Projects\smartCampus\server\server.js:1713:5)
-Continuous ping sweep error: Error: timeout exceeded when trying to connect
-    at C:\Projects\smartCampus\server\node_modules\pg-pool\index.js:45:11
-    at async Object.execute (C:\Projects\smartCampus\server\postgres.js:39:22)
-    at async Timeout.runContinuousPingSweep [as _onTimeout] (C:\Projects\smartCampus\server\server.js:1484:20)
-Scheduled router scan error: Error: timeout exceeded when trying to connect
-    at C:\Projects\smartCampus\server\node_modules\pg-pool\index.js:45:11
-    at async Object.execute (C:\Projects\smartCampus\server\postgres.js:39:22)
-    at async findDeviceByIpOrMac (C:\Projects\smartCampus\server\server.js:550:18)
-    at async upsertDeviceSnapshot (C:\Projects\smartCampus\server\server.js:597:20)
-    at async Timeout.runScheduledRouterScan [as _onTimeout] (C:\Projects\smartCampus\server\server.js:1444:5)
-Scheduled device ping sweep error: Error: timeout exceeded when trying to connect
-    at C:\Projects\smartCampus\server\node_modules\pg-pool\index.js:45:11
-    at runNextTicks (node:internal/process/task_queues:65:5)
-    at listOnTimeout (node:internal/timers:567:9)
-    at process.processTimers (node:internal/timers:541:7)
-    at async Object.execute (C:\Projects\smartCampus\server\postgres.js:39:22)
-    at async C:\Projects\smartCampus\server\server.js:1743:9
-    at async C:\Projects\smartCampus\server\server.js:1220:31
+    at async C:\Projects\smartCampus\server\server.js:1827:9
+    at async C:\Projects\smartCampus\server\server.js:1252:31
     at async Promise.all (index 4)
-    at async runWithConcurrency (C:\Projects\smartCampus\server\server.js:1224:3)
-    at async Timeout.runScheduledDevicePingSweep [as _onTimeout] (C:\Projects\smartCampus\server\server.js:1713:5)
+    at async runWithConcurrency (C:\Projects\smartCampus\server\server.js:1256:3)
+    at async Timeout.runScheduledDevicePingSweep [as _onTimeout] (C:\Projects\smartCampus\server\server.js:1797:5)
+sendAlertEmail error: Connection closed unexpectedly
+Error: timeout exceeded when trying to connect
+    at C:\Projects\smartCampus\server\node_modules\pg-pool\index.js:45:11
+    at async PGStore._asyncQuery (C:\Projects\smartCampus\server\node_modules\connect-pg-simple\index.js:322:21)
+Scheduled device ping sweep error: Error: timeout exceeded when trying to connect
+    at C:\Projects\smartCampus\server\node_modules\pg-pool\index.js:45:11
+    at async Object.execute (C:\Projects\smartCampus\server\postgres.js:39:22)
+    at async insertDeviceLog (C:\Projects\smartCampus\server\server.js:596:3)
+    at async C:\Projects\smartCampus\server\server.js:1834:7
+    at async C:\Projects\smartCampus\server\server.js:1252:31
+    at async Promise.all (index 2)
+    at async runWithConcurrency (C:\Projects\smartCampus\server\server.js:1256:3)
+    at async Timeout.runScheduledDevicePingSweep [as _onTimeout] (C:\Projects\smartCampus\server\server.js:1797:5)
 Continuous ping sweep error: Error: timeout exceeded when trying to connect
     at C:\Projects\smartCampus\server\node_modules\pg-pool\index.js:45:11
     at async Object.execute (C:\Projects\smartCampus\server\postgres.js:39:22)
-    at async Timeout.runContinuousPingSweep [as _onTimeout] (C:\Projects\smartCampus\server\server.js:1484:20)
+    at async Timeout.runContinuousPingSweep [as _onTimeout] (C:\Projects\smartCampus\server\server.js:1568:20)
+Scheduled router scan error: Error: timeout exceeded when trying to connect
+    at C:\Projects\smartCampus\server\node_modules\pg-pool\index.js:45:11
+    at async Object.execute (C:\Projects\smartCampus\server\postgres.js:39:22)
+    at async findDeviceByIpOrMac (C:\Projects\smartCampus\server\server.js:565:18)
+    at async upsertDeviceSnapshot (C:\Projects\smartCampus\server\server.js:612:20)
+    at async Timeout.runScheduledRouterScan [as _onTimeout] (C:\Projects\smartCampus\server\server.js:1528:5)
+Error: timeout exceeded when trying to connect
+    at C:\Projects\smartCampus\server\node_modules\pg-pool\index.js:45:11
+    at async PGStore._asyncQuery (C:\Projects\smartCampus\server\node_modules\connect-pg-simple\index.js:322:21)
 Continuous ping sweep error: Error: timeout exceeded when trying to connect
     at C:\Projects\smartCampus\server\node_modules\pg-pool\index.js:45:11
     at async Object.execute (C:\Projects\smartCampus\server\postgres.js:39:22)
-    at async Timeout.runContinuousPingSweep [as _onTimeout] (C:\Projects\smartCampus\server\server.js:1484:20)
-Scheduled router scan error: Error: timeout exceeded when trying to connect
+    at async Timeout.runContinuousPingSweep [as _onTimeout] (C:\Projects\smartCampus\server\server.js:1568:20)
+Scheduled device ping sweep error: Error: timeout exceeded when trying to connect
     at C:\Projects\smartCampus\server\node_modules\pg-pool\index.js:45:11
     at async Object.execute (C:\Projects\smartCampus\server\postgres.js:39:22)
-    at async findDeviceByIpOrMac (C:\Projects\smartCampus\server\server.js:550:18)
-    at async upsertDeviceSnapshot (C:\Projects\smartCampus\server\server.js:597:20)
-    at async Timeout.runScheduledRouterScan [as _onTimeout] (C:\Projects\smartCampus\server\server.js:1444:5)
+    at async Timeout.runScheduledDevicePingSweep [as _onTimeout] (C:\Projects\smartCampus\server\server.js:1791:20)
+Error: timeout exceeded when trying to connect
+    at C:\Projects\smartCampus\server\node_modules\pg-pool\index.js:45:11
+    at async PGStore._asyncQuery (C:\Projects\smartCampus\server\node_modules\connect-pg-simple\index.js:322:21)
 Scheduled device ping sweep error: Error: timeout exceeded when trying to connect
+    at C:\Projects\smartCampus\server\node_modules\pg-pool\index.js:45:11
+    at async Object.execute (C:\Projects\smartCampus\server\postgres.js:39:22)
+    at async Timeout.runScheduledDevicePingSweep [as _onTimeout] (C:\Projects\smartCampus\server\server.js:1791:20)
+Devices load error: Error: timeout exceeded when trying to connect
     at C:\Projects\smartCampus\server\node_modules\pg-pool\index.js:45:11
     at runNextTicks (node:internal/process/task_queues:65:5)
-    at listOnTimeout (node:internal/timers:567:9)
-    at process.processTimers (node:internal/timers:541:7)
+    at listOnTimeout (node:internal/timers:644:9)
+    at process.processTimers (node:internal/timers:618:7)
     at async Object.execute (C:\Projects\smartCampus\server\postgres.js:39:22)
-    at async C:\Projects\smartCampus\server\server.js:1743:9
-    at async C:\Projects\smartCampus\server\server.js:1220:31
-    at async Promise.all (index 3)
-    at async runWithConcurrency (C:\Projects\smartCampus\server\server.js:1224:3)
-    at async Timeout.runScheduledDevicePingSweep [as _onTimeout] (C:\Projects\smartCampus\server\server.js:1713:5)
+    at async getMappedDevices (C:\Projects\smartCampus\server\server.js:811:18)
+    at async C:\Projects\smartCampus\server\server.js:2037:21
 Scheduled router scan error: Error: timeout exceeded when trying to connect
     at C:\Projects\smartCampus\server\node_modules\pg-pool\index.js:45:11
     at async Object.execute (C:\Projects\smartCampus\server\postgres.js:39:22)
-    at async findDeviceByIpOrMac (C:\Projects\smartCampus\server\server.js:550:18)
-    at async upsertDeviceSnapshot (C:\Projects\smartCampus\server\server.js:597:20)
-    at async Timeout.runScheduledRouterScan [as _onTimeout] (C:\Projects\smartCampus\server\server.js:1444:5)
-Scheduled device ping sweep error: Error: timeout exceeded when trying to connect
+    at async insertDeviceLog (C:\Projects\smartCampus\server\server.js:596:3)
+    at async upsertDeviceSnapshot (C:\Projects\smartCampus\server\server.js:651:5)
+    at async Timeout.runScheduledRouterScan [as _onTimeout] (C:\Projects\smartCampus\server\server.js:1528:5)
+Error: timeout exceeded when trying to connect
     at C:\Projects\smartCampus\server\node_modules\pg-pool\index.js:45:11
-    at async Object.execute (C:\Projects\smartCampus\server\postgres.js:39:22)
-    at async Timeout.runScheduledDevicePingSweep [as _onTimeout] (C:\Projects\smartCampus\server\server.js:1707:20)
-Scheduled device ping sweep error: Error: timeout exceeded when trying to connect
+    at async PGStore._asyncQuery (C:\Projects\smartCampus\server\node_modules\connect-pg-simple\index.js:322:21)
+Error: timeout exceeded when trying to connect
     at C:\Projects\smartCampus\server\node_modules\pg-pool\index.js:45:11
-    at runNextTicks (node:internal/process/task_queues:65:5)
-    at listOnTimeout (node:internal/timers:567:9)
-    at process.processTimers (node:internal/timers:541:7)
-    at async Object.execute (C:\Projects\smartCampus\server\postgres.js:39:22)
-    at async C:\Projects\smartCampus\server\server.js:1743:9
-    at async C:\Projects\smartCampus\server\server.js:1220:31
-    at async Promise.all (index 0)
-    at async runWithConcurrency (C:\Projects\smartCampus\server\server.js:1224:3)
-    at async Timeout.runScheduledDevicePingSweep [as _onTimeout] (C:\Projects\smartCampus\server\server.js:1713:5)
-Scheduled router scan error: Error: timeout exceeded when trying to connect
-    at C:\Projects\smartCampus\server\node_modules\pg-pool\index.js:45:11
-    at async Object.execute (C:\Projects\smartCampus\server\postgres.js:39:22)
-    at async findDeviceByIpOrMac (C:\Projects\smartCampus\server\server.js:550:18)
-    at async upsertDeviceSnapshot (C:\Projects\smartCampus\server\server.js:597:20)
-    at async Timeout.runScheduledRouterScan [as _onTimeout] (C:\Projects\smartCampus\server\server.js:1444:5)
-Scheduled router scan error: Error: timeout exceeded when trying to connect
-    at C:\Projects\smartCampus\server\node_modules\pg-pool\index.js:45:11
-    at async Object.execute (C:\Projects\smartCampus\server\postgres.js:39:22)
-    at async findDeviceByIpOrMac (C:\Projects\smartCampus\server\server.js:550:18)
-    at async upsertDeviceSnapshot (C:\Projects\smartCampus\server\server.js:597:20)
-    at async Timeout.runScheduledRouterScan [as _onTimeout] (C:\Projects\smartCampus\server\server.js:1444:5)
+    at async PGStore._asyncQuery (C:\Projects\smartCampus\server\node_modules\connect-pg-simple\index.js:322:21)
 Scheduled device ping sweep error: Error: Connection terminated unexpectedly
     at C:\Projects\smartCampus\server\node_modules\pg-pool\index.js:45:11
     at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
     at async Object.execute (C:\Projects\smartCampus\server\postgres.js:39:22)
-    at async Timeout.runScheduledDevicePingSweep [as _onTimeout] (C:\Projects\smartCampus\server\server.js:1707:20)
+    at async Timeout.runScheduledDevicePingSweep [as _onTimeout] (C:\Projects\smartCampus\server\server.js:1791:20)
+Continuous ping sweep error: Error: Connection terminated unexpectedly
+    at C:\Projects\smartCampus\server\node_modules\pg-pool\index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async Object.execute (C:\Projects\smartCampus\server\postgres.js:39:22)
+    at async Timeout.runContinuousPingSweep [as _onTimeout] (C:\Projects\smartCampus\server\server.js:1568:20)
+Scheduled router scan error: Error: timeout exceeded when trying to connect
+    at C:\Projects\smartCampus\server\node_modules\pg-pool\index.js:45:11
+    at runNextTicks (node:internal/process/task_queues:65:5)
+    at process.processTimers (node:internal/timers:615:9)
+    at async Object.execute (C:\Projects\smartCampus\server\postgres.js:39:22)
+    at async findDeviceByIpOrMac (C:\Projects\smartCampus\server\server.js:565:18)
+    at async upsertDeviceSnapshot (C:\Projects\smartCampus\server\server.js:612:20)
+    at async Timeout.runScheduledRouterScan [as _onTimeout] (C:\Projects\smartCampus\server\server.js:1528:5)
+Continuous ping sweep error: Error: getaddrinfo ENOTFOUND aws-0-ap-southeast-2.pooler.supabase.com
+    at C:\Projects\smartCampus\server\node_modules\pg-pool\index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async Object.execute (C:\Projects\smartCampus\server\postgres.js:39:22)
+    at async Timeout.runContinuousPingSweep [as _onTimeout] (C:\Projects\smartCampus\server\server.js:1568:20) {
+  errno: -3008,
+  code: 'ENOTFOUND',
+  syscall: 'getaddrinfo',
+  hostname: 'aws-0-ap-southeast-2.pooler.supabase.com'
+}
+Error: timeout exceeded when trying to connect
+    at C:\Projects\smartCampus\server\node_modules\pg-pool\index.js:45:11
+    at runNextTicks (node:internal/process/task_queues:65:5)
+    at listOnTimeout (node:internal/timers:644:9)
+    at process.processTimers (node:internal/timers:618:7)
+    at async PGStore._asyncQuery (C:\Projects\smartCampus\server\node_modules\connect-pg-simple\index.js:322:21)
+Scheduled device ping sweep error: Error: getaddrinfo ENOTFOUND aws-0-ap-southeast-2.pooler.supabase.com
+    at C:\Projects\smartCampus\server\node_modules\pg-pool\index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async Object.execute (C:\Projects\smartCampus\server\postgres.js:39:22)
+    at async Timeout.runScheduledDevicePingSweep [as _onTimeout] (C:\Projects\smartCampus\server\server.js:1791:20) {
+  errno: -3008,
+  code: 'ENOTFOUND',
+  syscall: 'getaddrinfo',
+  hostname: 'aws-0-ap-southeast-2.pooler.supabase.com'
+}
+Scheduled discovery scan error: Error: getaddrinfo ENOTFOUND aws-0-ap-southeast-2.pooler.supabase.com
+    at C:\Projects\smartCampus\server\node_modules\pg-pool\index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async Object.execute (C:\Projects\smartCampus\server\postgres.js:39:22)
+    at async startScanSession (C:\Projects\smartCampus\server\server.js:1400:20)
+    at async runTrackedDiscoveryScan (C:\Projects\smartCampus\server\server.js:1425:25)
+    at async Timeout.runScheduledDiscoveryScan [as _onTimeout] (C:\Projects\smartCampus\server\server.js:1546:20) {
+  errno: -3008,
+  code: 'ENOTFOUND',
+  syscall: 'getaddrinfo',
+  hostname: 'aws-0-ap-southeast-2.pooler.supabase.com'
+}
+Failed to prune sessions: Error: getaddrinfo ENOTFOUND aws-0-ap-southeast-2.pooler.supabase.com
+    at C:\Projects\smartCampus\server\node_modules\pg-pool\index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async PGStore._asyncQuery (C:\Projects\smartCampus\server\node_modules\connect-pg-simple\index.js:322:21) {
+  errno: -3008,
+  code: 'ENOTFOUND',
+  syscall: 'getaddrinfo',
+  hostname: 'aws-0-ap-southeast-2.pooler.supabase.com'
+}
+Error: getaddrinfo ENOTFOUND aws-0-ap-southeast-2.pooler.supabase.com
+    at C:\Projects\smartCampus\server\node_modules\pg-pool\index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async PGStore._asyncQuery (C:\Projects\smartCampus\server\node_modules\connect-pg-simple\index.js:322:21)
+Error: getaddrinfo ENOTFOUND aws-0-ap-southeast-2.pooler.supabase.com
+    at C:\Projects\smartCampus\server\node_modules\pg-pool\index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async PGStore._asyncQuery (C:\Projects\smartCampus\server\node_modules\connect-pg-simple\index.js:322:21)
+Error: getaddrinfo ENOTFOUND aws-0-ap-southeast-2.pooler.supabase.com
+    at C:\Projects\smartCampus\server\node_modules\pg-pool\index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async PGStore._asyncQuery (C:\Projects\smartCampus\server\node_modules\connect-pg-simple\index.js:322:21)
+Continuous ping sweep error: Error: getaddrinfo ENOTFOUND aws-0-ap-southeast-2.pooler.supabase.com
+    at C:\Projects\smartCampus\server\node_modules\pg-pool\index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async Object.execute (C:\Projects\smartCampus\server\postgres.js:39:22)
+    at async Timeout.runContinuousPingSweep [as _onTimeout] (C:\Projects\smartCampus\server\server.js:1568:20) {
+  errno: -3008,
+  code: 'ENOTFOUND',
+  syscall: 'getaddrinfo',
+  hostname: 'aws-0-ap-southeast-2.pooler.supabase.com'
+}
+Continuous ping sweep error: Error: getaddrinfo ENOTFOUND aws-0-ap-southeast-2.pooler.supabase.com
+    at C:\Projects\smartCampus\server\node_modules\pg-pool\index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async Object.execute (C:\Projects\smartCampus\server\postgres.js:39:22)
+    at async Timeout.runContinuousPingSweep [as _onTimeout] (C:\Projects\smartCampus\server\server.js:1568:20) {
+  errno: -3008,
+  code: 'ENOTFOUND',
+  syscall: 'getaddrinfo',
+  hostname: 'aws-0-ap-southeast-2.pooler.supabase.com'
+}
+Continuous ping sweep error: Error: getaddrinfo ENOTFOUND aws-0-ap-southeast-2.pooler.supabase.com
+    at C:\Projects\smartCampus\server\node_modules\pg-pool\index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async Object.execute (C:\Projects\smartCampus\server\postgres.js:39:22)
+    at async Timeout.runContinuousPingSweep [as _onTimeout] (C:\Projects\smartCampus\server\server.js:1568:20) {
+  errno: -3008,
+  code: 'ENOTFOUND',
+  syscall: 'getaddrinfo',
+  hostname: 'aws-0-ap-southeast-2.pooler.supabase.com'
+}
+Scheduled device ping sweep error: Error: getaddrinfo ENOTFOUND aws-0-ap-southeast-2.pooler.supabase.com
+    at C:\Projects\smartCampus\server\node_modules\pg-pool\index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async Object.execute (C:\Projects\smartCampus\server\postgres.js:39:22)
+    at async Timeout.runScheduledDevicePingSweep [as _onTimeout] (C:\Projects\smartCampus\server\server.js:1791:20) {
+  errno: -3008,
+  code: 'ENOTFOUND',
+  syscall: 'getaddrinfo',
+  hostname: 'aws-0-ap-southeast-2.pooler.supabase.com'
+}
+Scheduled discovery scan error: Error: getaddrinfo ENOTFOUND aws-0-ap-southeast-2.pooler.supabase.com
+    at C:\Projects\smartCampus\server\node_modules\pg-pool\index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async Object.execute (C:\Projects\smartCampus\server\postgres.js:39:22)
+    at async startScanSession (C:\Projects\smartCampus\server\server.js:1400:20)
+    at async runTrackedDiscoveryScan (C:\Projects\smartCampus\server\server.js:1425:25)
+    at async Timeout.runScheduledDiscoveryScan [as _onTimeout] (C:\Projects\smartCampus\server\server.js:1546:20) {
+  errno: -3008,
+  code: 'ENOTFOUND',
+  syscall: 'getaddrinfo',
+  hostname: 'aws-0-ap-southeast-2.pooler.supabase.com'
+}
+Failed to prune sessions: Error: getaddrinfo ENOTFOUND aws-0-ap-southeast-2.pooler.supabase.com
+    at C:\Projects\smartCampus\server\node_modules\pg-pool\index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async PGStore._asyncQuery (C:\Projects\smartCampus\server\node_modules\connect-pg-simple\index.js:322:21) {
+  errno: -3008,
+  code: 'ENOTFOUND',
+  syscall: 'getaddrinfo',
+  hostname: 'aws-0-ap-southeast-2.pooler.supabase.com'
+}
+Continuous ping sweep error: Error: getaddrinfo ENOTFOUND aws-0-ap-southeast-2.pooler.supabase.com
+    at C:\Projects\smartCampus\server\node_modules\pg-pool\index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async Object.execute (C:\Projects\smartCampus\server\postgres.js:39:22)
+    at async Timeout.runContinuousPingSweep [as _onTimeout] (C:\Projects\smartCampus\server\server.js:1568:20) {
+  errno: -3008,
+  code: 'ENOTFOUND',
+  syscall: 'getaddrinfo',
+  hostname: 'aws-0-ap-southeast-2.pooler.supabase.com'
+}
+Error: getaddrinfo ENOTFOUND aws-0-ap-southeast-2.pooler.supabase.com
+    at C:\Projects\smartCampus\server\node_modules\pg-pool\index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async PGStore._asyncQuery (C:\Projects\smartCampus\server\node_modules\connect-pg-simple\index.js:322:21)
+Error: getaddrinfo ENOTFOUND aws-0-ap-southeast-2.pooler.supabase.com
+    at C:\Projects\smartCampus\server\node_modules\pg-pool\index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async PGStore._asyncQuery (C:\Projects\smartCampus\server\node_modules\connect-pg-simple\index.js:322:21)
+Error: getaddrinfo ENOTFOUND aws-0-ap-southeast-2.pooler.supabase.com
+    at C:\Projects\smartCampus\server\node_modules\pg-pool\index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async PGStore._asyncQuery (C:\Projects\smartCampus\server\node_modules\connect-pg-simple\index.js:322:21)
+Continuous ping sweep error: Error: getaddrinfo ENOTFOUND aws-0-ap-southeast-2.pooler.supabase.com
+    at C:\Projects\smartCampus\server\node_modules\pg-pool\index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async Object.execute (C:\Projects\smartCampus\server\postgres.js:39:22)
+    at async Timeout.runContinuousPingSweep [as _onTimeout] (C:\Projects\smartCampus\server\server.js:1568:20) {
+  errno: -3008,
+  code: 'ENOTFOUND',
+  syscall: 'getaddrinfo',
+  hostname: 'aws-0-ap-southeast-2.pooler.supabase.com'
+}
+Continuous ping sweep error: Error: getaddrinfo ENOTFOUND aws-0-ap-southeast-2.pooler.supabase.com
+    at C:\Projects\smartCampus\server\node_modules\pg-pool\index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async Object.execute (C:\Projects\smartCampus\server\postgres.js:39:22)
+    at async Timeout.runContinuousPingSweep [as _onTimeout] (C:\Projects\smartCampus\server\server.js:1568:20) {
+  errno: -3008,
+  code: 'ENOTFOUND',
+  syscall: 'getaddrinfo',
+  hostname: 'aws-0-ap-southeast-2.pooler.supabase.com'
+}
+Continuous ping sweep error: Error: getaddrinfo ENOTFOUND aws-0-ap-southeast-2.pooler.supabase.com
+    at C:\Projects\smartCampus\server\node_modules\pg-pool\index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async Object.execute (C:\Projects\smartCampus\server\postgres.js:39:22)
+    at async Timeout.runContinuousPingSweep [as _onTimeout] (C:\Projects\smartCampus\server\server.js:1568:20) {
+  errno: -3008,
+  code: 'ENOTFOUND',
+  syscall: 'getaddrinfo',
+  hostname: 'aws-0-ap-southeast-2.pooler.supabase.com'
+}
+Continuous ping sweep error: Error: getaddrinfo ENOTFOUND aws-0-ap-southeast-2.pooler.supabase.com
+    at C:\Projects\smartCampus\server\node_modules\pg-pool\index.js:45:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async Object.execute (C:\Projects\smartCampus\server\postgres.js:39:22)
+    at async Timeout.runContinuousPingSweep [as _onTimeout] (C:\Projects\smartCampus\server\server.js:1568:20) {
+  errno: -3008,
+  code: 'ENOTFOUND',
+  syscall: 'getaddrinfo',
+  hostname: 'aws-0-ap-southeast-2.pooler.supabase.com'
+}
 Scheduled router scan error: Error: Connection terminated due to connection timeout
     at C:\Projects\smartCampus\server\node_modules\pg-pool\index.js:45:11
     at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
     at async Object.execute (C:\Projects\smartCampus\server\postgres.js:39:22)
-    at async findDeviceByIpOrMac (C:\Projects\smartCampus\server\server.js:550:18)
-    at async upsertDeviceSnapshot (C:\Projects\smartCampus\server\server.js:597:20)
-    at async Timeout.runScheduledRouterScan [as _onTimeout] (C:\Projects\smartCampus\server\server.js:1444:5) {
+    at async findDeviceByIpOrMac (C:\Projects\smartCampus\server\server.js:565:18)
+    at async upsertDeviceSnapshot (C:\Projects\smartCampus\server\server.js:612:20)
+    at async Timeout.runScheduledRouterScan [as _onTimeout] (C:\Projects\smartCampus\server\server.js:1528:5) {
   [cause]: Error: Connection terminated unexpectedly
       at Connection.<anonymous> (C:\Projects\smartCampus\server\node_modules\pg\lib\client.js:204:73)
-      at Object.onceWrapper (node:events:622:28)
-      at Connection.emit (node:events:508:28)
+      at Connection.wrapper (node:events:639:12)
+      at Connection.emit (node:events:514:28)
       at Socket.<anonymous> (C:\Projects\smartCampus\server\node_modules\pg\lib\connection.js:64:12)
-      at Socket.emit (node:events:508:28)
-      at TCP.<anonymous> (node:net:346:12)
+      at Socket.emit (node:events:514:28)
+      at TCP.<anonymous> (node:net:362:12)
 }
-Scheduled discovery scan error: error: duplicate key value violates unique constraint "DEVICE_MACAddress_key"
+Continuous ping sweep error: Error: Connection terminated due to connection timeout
     at C:\Projects\smartCampus\server\node_modules\pg-pool\index.js:45:11
     at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
     at async Object.execute (C:\Projects\smartCampus\server\postgres.js:39:22)
-    at async upsertDiscoveredDevice (C:\Projects\smartCampus\server\server.js:680:5)
-    at async discoverNetworkDevices (C:\Projects\smartCampus\server\server.js:1305:22)
-    at async Timeout.runScheduledDiscoveryScan [as _onTimeout] (C:\Projects\smartCampus\server\server.js:1462:20) {
-  length: 229,
-  severity: 'ERROR',
-  code: '23505',
-  detail: 'Key ("MACAddress")=(7e-68-e5-fd-9e-b4) already exists.',
-  hint: undefined,
-  position: undefined,
-  internalPosition: undefined,
-  internalQuery: undefined,
-  where: undefined,
-  schema: 'public',
-  table: 'DEVICE',
-  column: undefined,
-  dataType: undefined,
-  constraint: 'DEVICE_MACAddress_key',
-  file: 'nbtinsert.c',
-  line: '666',
-  routine: '_bt_check_unique'
+    at async Timeout.runContinuousPingSweep [as _onTimeout] (C:\Projects\smartCampus\server\server.js:1568:20) {
+  [cause]: Error: Connection terminated unexpectedly
+      at Connection.<anonymous> (C:\Projects\smartCampus\server\node_modules\pg\lib\client.js:204:73)
+      at Connection.wrapper (node:events:639:12)
+      at Connection.emit (node:events:514:28)
+      at Socket.<anonymous> (C:\Projects\smartCampus\server\node_modules\pg\lib\connection.js:64:12)
+      at Socket.emit (node:events:514:28)
+      at TCP.<anonymous> (node:net:362:12)
 }
-Scheduled discovery scan error: error: duplicate key value violates unique constraint "DEVICE_MACAddress_key"
+Scheduled device ping sweep error: Error: Connection terminated due to connection timeout
     at C:\Projects\smartCampus\server\node_modules\pg-pool\index.js:45:11
     at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
     at async Object.execute (C:\Projects\smartCampus\server\postgres.js:39:22)
-    at async upsertDiscoveredDevice (C:\Projects\smartCampus\server\server.js:680:5)
-    at async discoverNetworkDevices (C:\Projects\smartCampus\server\server.js:1305:22)
-    at async Timeout.runScheduledDiscoveryScan [as _onTimeout] (C:\Projects\smartCampus\server\server.js:1462:20) {
-  length: 229,
-  severity: 'ERROR',
-  code: '23505',
-  detail: 'Key ("MACAddress")=(7e-68-e5-fd-9e-b4) already exists.',
-  hint: undefined,
-  position: undefined,
-  internalPosition: undefined,
-  internalQuery: undefined,
-  where: undefined,
-  schema: 'public',
-  table: 'DEVICE',
-  column: undefined,
-  dataType: undefined,
-  constraint: 'DEVICE_MACAddress_key',
-  file: 'nbtinsert.c',
-  line: '666',
-  routine: '_bt_check_unique'
+    at async Timeout.runScheduledDevicePingSweep [as _onTimeout] (C:\Projects\smartCampus\server\server.js:1791:20) {
+  [cause]: Error: Connection terminated unexpectedly
+      at Connection.<anonymous> (C:\Projects\smartCampus\server\node_modules\pg\lib\client.js:204:73)
+      at Connection.wrapper (node:events:639:12)
+      at Connection.emit (node:events:514:28)
+      at Socket.<anonymous> (C:\Projects\smartCampus\server\node_modules\pg\lib\connection.js:64:12)
+      at Socket.emit (node:events:514:28)
+      at TCP.<anonymous> (node:net:362:12)
 }
-Scheduled discovery scan error: error: duplicate key value violates unique constraint "DEVICE_MACAddress_key"
+Continuous ping sweep error: Error: Connection terminated due to connection timeout
     at C:\Projects\smartCampus\server\node_modules\pg-pool\index.js:45:11
     at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
     at async Object.execute (C:\Projects\smartCampus\server\postgres.js:39:22)
-    at async upsertDiscoveredDevice (C:\Projects\smartCampus\server\server.js:680:5)
-    at async discoverNetworkDevices (C:\Projects\smartCampus\server\server.js:1305:22)
-    at async Timeout.runScheduledDiscoveryScan [as _onTimeout] (C:\Projects\smartCampus\server\server.js:1462:20) {
-  length: 229,
-  severity: 'ERROR',
-  code: '23505',
-  detail: 'Key ("MACAddress")=(7e-68-e5-fd-9e-b4) already exists.',
-  hint: undefined,
-  position: undefined,
-  internalPosition: undefined,
-  internalQuery: undefined,
-  where: undefined,
-  schema: 'public',
-  table: 'DEVICE',
-  column: undefined,
-  dataType: undefined,
-  constraint: 'DEVICE_MACAddress_key',
-  file: 'nbtinsert.c',
-  line: '666',
-  routine: '_bt_check_unique'
-}
-Scheduled discovery scan error: error: duplicate key value violates unique constraint "DEVICE_MACAddress_key"
-    at C:\Projects\smartCampus\server\node_modules\pg-pool\index.js:45:11
-    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
-    at async Object.execute (C:\Projects\smartCampus\server\postgres.js:39:22)
-    at async upsertDiscoveredDevice (C:\Projects\smartCampus\server\server.js:680:5)
-    at async discoverNetworkDevices (C:\Projects\smartCampus\server\server.js:1305:22)
-    at async Timeout.runScheduledDiscoveryScan [as _onTimeout] (C:\Projects\smartCampus\server\server.js:1462:20) {
-  length: 229,
-  severity: 'ERROR',
-  code: '23505',
-  detail: 'Key ("MACAddress")=(7e-68-e5-fd-9e-b4) already exists.',
-  hint: undefined,
-  position: undefined,
-  internalPosition: undefined,
-  internalQuery: undefined,
-  where: undefined,
-  schema: 'public',
-  table: 'DEVICE',
-  column: undefined,
-  dataType: undefined,
-  constraint: 'DEVICE_MACAddress_key',
-  file: 'nbtinsert.c',
-  line: '666',
-  routine: '_bt_check_unique'
-}
-Scheduled discovery scan error: error: duplicate key value violates unique constraint "DEVICE_MACAddress_key"
-    at C:\Projects\smartCampus\server\node_modules\pg-pool\index.js:45:11
-    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
-    at async Object.execute (C:\Projects\smartCampus\server\postgres.js:39:22)
-    at async upsertDiscoveredDevice (C:\Projects\smartCampus\server\server.js:680:5)
-    at async discoverNetworkDevices (C:\Projects\smartCampus\server\server.js:1305:22)
-    at async Timeout.runScheduledDiscoveryScan [as _onTimeout] (C:\Projects\smartCampus\server\server.js:1462:20) {
-  length: 229,
-  severity: 'ERROR',
-  code: '23505',
-  detail: 'Key ("MACAddress")=(7e-68-e5-fd-9e-b4) already exists.',
-  hint: undefined,
-  position: undefined,
-  internalPosition: undefined,
-  internalQuery: undefined,
-  where: undefined,
-  schema: 'public',
-  table: 'DEVICE',
-  column: undefined,
-  dataType: undefined,
-  constraint: 'DEVICE_MACAddress_key',
-  file: 'nbtinsert.c',
-  line: '666',
-  routine: '_bt_check_unique'
+    at async Timeout.runContinuousPingSweep [as _onTimeout] (C:\Projects\smartCampus\server\server.js:1568:20) {
+  [cause]: Error: Connection terminated unexpectedly
+      at Connection.<anonymous> (C:\Projects\smartCampus\server\node_modules\pg\lib\client.js:204:73)
+      at Connection.wrapper (node:events:639:12)
+      at Connection.emit (node:events:514:28)
+      at Socket.<anonymous> (C:\Projects\smartCampus\server\node_modules\pg\lib\connection.js:64:12)
+      at Socket.emit (node:events:514:28)
+      at TCP.<anonymous> (node:net:362:12)
 }
