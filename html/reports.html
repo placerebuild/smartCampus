@@ -29,23 +29,32 @@
 
     <div class="main-content">
 
-        <!-- Period Filter -->
-        <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
-            <div>
-                <h5 class="section-heading mb-1">Network Analytics</h5>
-                <p class="text-muted mb-0" style="font-size:0.875rem;">Historical trends, performance summaries, and infrastructure utilization.</p>
+        <!-- Reports Hero -->
+        <div class="reports-hero mb-4">
+            <div class="reports-hero-left">
+                <div class="reports-hero-eyebrow"><i class="fas fa-chart-line me-1"></i>Analytics &amp; Reports</div>
+                <h4 class="reports-hero-title">Network Analytics</h4>
+                <p class="reports-hero-sub mb-0">Historical trends, performance summaries, and infrastructure utilization across the campus network.</p>
+                <div class="reports-hero-chips">
+                    <span class="reports-hero-chip"><i class="fas fa-wifi me-1"></i>Live Monitoring</span>
+                    <span class="reports-hero-chip"><i class="fas fa-bell me-1"></i>Alert Tracking</span>
+                    <span class="reports-hero-chip"><i class="fas fa-server me-1"></i>Device Health</span>
+                </div>
             </div>
-            <ul class="nav nav-pills" id="period-tabs">
-                <li class="nav-item">
-                    <button class="nav-link active" data-period="24h">Last 24 Hours</button>
-                </li>
-                <li class="nav-item">
-                    <button class="nav-link" data-period="7d">Last 7 Days</button>
-                </li>
-                <li class="nav-item">
-                    <button class="nav-link" data-period="30d">Last 30 Days</button>
-                </li>
-            </ul>
+            <div class="reports-hero-right">
+                <div class="reports-period-label">View period</div>
+                <div class="period-tabs-wrap" id="period-tabs">
+                    <button class="period-tab active" data-period="24h">
+                        <i class="fas fa-clock me-1"></i>24 Hours
+                    </button>
+                    <button class="period-tab" data-period="7d">
+                        <i class="fas fa-calendar-week me-1"></i>7 Days
+                    </button>
+                    <button class="period-tab" data-period="30d">
+                        <i class="fas fa-calendar-alt me-1"></i>30 Days
+                    </button>
+                </div>
+            </div>
         </div>
 
         <!-- Summary Cards -->
@@ -196,7 +205,9 @@
                     <div id="incident-trend-empty" class="text-center text-muted py-5" style="display:none!important;">
                         <i class="fas fa-chart-bar fa-2x mb-2 opacity-50"></i><br>No incident data for this period.
                     </div>
-                    <canvas id="incidentTrendChart" height="220"></canvas>
+                    <div style="height:220px;position:relative;">
+                        <canvas id="incidentTrendChart"></canvas>
+                    </div>
                 </div>
             </div>
             <div class="col-12 col-lg-4">
@@ -221,7 +232,9 @@
                     <div id="top-devices-empty" class="text-center text-muted py-5" style="display:none!important;">
                         <i class="fas fa-check-circle fa-2x mb-2 opacity-50 text-success"></i><br>No incidents recorded for this period.
                     </div>
-                    <canvas id="topDevicesChart"></canvas>
+                    <div class="chart-scroll-box">
+                        <canvas id="topDevicesChart"></canvas>
+                    </div>
                 </div>
             </div>
             <div class="col-12 col-lg-6">
@@ -233,7 +246,9 @@
                     <div id="location-health-empty" class="text-center text-muted py-5" style="display:none!important;">
                         <i class="fas fa-building fa-2x mb-2 opacity-50"></i><br>No location data for this period.
                     </div>
-                    <canvas id="locationHealthChart"></canvas>
+                    <div class="chart-scroll-box">
+                        <canvas id="locationHealthChart"></canvas>
+                    </div>
                 </div>
             </div>
         </div>
@@ -247,7 +262,9 @@
             <div id="uptime-bar-empty" class="text-center text-muted py-5" style="display:none!important;">
                 <i class="fas fa-chart-bar fa-2x mb-2 opacity-50"></i><br>No uptime data for this period yet.
             </div>
-            <canvas id="uptimeBarChart"></canvas>
+            <div id="uptime-bar-scroll">
+                <canvas id="uptimeBarChart"></canvas>
+            </div>
         </div>
 
         <!-- Device Performance Table -->
@@ -282,49 +299,57 @@
                     </tbody>
                 </table>
             </div>
-        </div>
-
-        <!-- AI Network Insights -->
-        <div class="card panel-card p-4 mt-4" id="ai-insights-card">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <div class="d-flex align-items-center gap-2">
-                    <span class="stat-icon stat-icon-primary" style="width:32px;height:32px;font-size:0.9rem;flex-shrink:0;">
-                        <i class="fas fa-robot"></i>
-                    </span>
-                    <div>
-                        <h6 class="section-title mb-0">AI Network Insights</h6>
-                        <small class="text-muted">Powered by Claude — health assessment &amp; recommendations</small>
-                    </div>
-                </div>
-                <button class="btn btn-outline-primary btn-sm" id="refresh-ai-insights-btn">
-                    <i class="fas fa-sync-alt me-1"></i>Generate Insights
+            <div id="perf-table-toggle-row" class="text-center pt-2 pb-1" style="display:none;">
+                <button class="btn btn-sm btn-outline-secondary" id="perf-table-toggle-btn">
+                    <i class="fas fa-chevron-down me-1" id="perf-table-toggle-icon"></i>
+                    <span id="perf-table-toggle-label">Show All Devices</span>
                 </button>
             </div>
+        </div>
 
-            <!-- Loading state -->
-            <div id="ai-insights-loading" class="text-center text-muted py-4" style="display:none;">
-                <i class="fas fa-circle-notch fa-spin fa-lg mb-2"></i>
-                <div class="mt-2" style="font-size:0.875rem;">Analyzing network telemetry with AI…</div>
-            </div>
+        <!-- AI Insights floating button + popup -->
+        <button id="ai-insights-fab" title="AI Network Insights" aria-label="Open AI Network Insights">
+            <i class="fas fa-robot"></i>
+        </button>
 
-            <!-- Empty / not yet loaded state -->
-            <div id="ai-insights-empty" class="text-center text-muted py-4">
-                <i class="fas fa-brain fa-2x mb-2 opacity-50"></i>
-                <div class="mt-2" style="font-size:0.875rem;">Click <strong>Generate Insights</strong> to run an AI analysis of your network data.</div>
-            </div>
-
-            <!-- Error state -->
-            <div id="ai-insights-error" class="alert alert-warning mb-0" style="display:none;">
-                <i class="fas fa-exclamation-triangle me-2"></i>
-                <span id="ai-insights-error-msg">Unable to load AI insights.</span>
-            </div>
-
-            <!-- Insights content -->
-            <div id="ai-insights-content" style="display:none;">
-                <div id="ai-insights-text" class="ai-insights-body"></div>
-                <div class="text-end mt-3">
-                    <small class="text-muted" id="ai-insights-timestamp"></small>
+        <div id="ai-insights-panel" role="dialog" aria-label="AI Network Insights" aria-hidden="true">
+            <div class="ai-panel-header">
+                <div>
+                    <div class="ai-panel-title"><i class="fas fa-robot me-2"></i>AI Network Insights</div>
                 </div>
+                <button class="ai-panel-close" id="ai-insights-close" aria-label="Close">&times;</button>
+            </div>
+            <div class="ai-panel-body">
+                <!-- Loading state -->
+                <div id="ai-insights-loading" class="text-center text-muted py-3" style="display:none;">
+                    <i class="fas fa-circle-notch fa-spin fa-lg mb-2"></i>
+                    <div class="mt-2" style="font-size:0.8rem;">Analyzing network telemetry with AI…</div>
+                </div>
+
+                <!-- Empty / not yet loaded state -->
+                <div id="ai-insights-empty" class="text-center text-muted py-3">
+                    <i class="fas fa-brain fa-2x mb-2 opacity-50"></i>
+                    <div class="mt-2" style="font-size:0.8rem;">Click <strong>Generate Insights</strong> to run an AI analysis of your network data.</div>
+                </div>
+
+                <!-- Error state -->
+                <div id="ai-insights-error" class="alert alert-warning mb-0 py-2" style="display:none;font-size:0.8rem;">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    <span id="ai-insights-error-msg">Unable to load AI insights.</span>
+                </div>
+
+                <!-- Insights content -->
+                <div id="ai-insights-content" style="display:none;">
+                    <div id="ai-insights-text" class="ai-insights-body"></div>
+                    <div class="text-end mt-2">
+                        <small class="text-muted" id="ai-insights-timestamp"></small>
+                    </div>
+                </div>
+            </div>
+            <div class="ai-panel-footer">
+                <button class="btn btn-primary btn-sm w-100" id="refresh-ai-insights-btn">
+                    <i class="fas fa-sync-alt me-1"></i>Generate Insights
+                </button>
             </div>
         </div>
 
@@ -337,6 +362,36 @@
     <script src="../js/monitoring.js"></script>
     <script src="../js/analytics.js"></script>
     <script type="module" src="../js/auth.js"></script>
+    <script>
+      (function () {
+        const fab = document.getElementById('ai-insights-fab');
+        const panel = document.getElementById('ai-insights-panel');
+        const closeBtn = document.getElementById('ai-insights-close');
+        if (!fab || !panel) return;
+
+        function openPanel() {
+          panel.classList.add('ai-panel-open');
+          panel.setAttribute('aria-hidden', 'false');
+          fab.setAttribute('aria-expanded', 'true');
+        }
+        function closePanel() {
+          panel.classList.remove('ai-panel-open');
+          panel.setAttribute('aria-hidden', 'true');
+          fab.setAttribute('aria-expanded', 'false');
+        }
+
+        fab.addEventListener('click', function () {
+          panel.classList.contains('ai-panel-open') ? closePanel() : openPanel();
+        });
+        if (closeBtn) closeBtn.addEventListener('click', closePanel);
+
+        document.addEventListener('click', function (e) {
+          if (panel.classList.contains('ai-panel-open') && !panel.contains(e.target) && !fab.contains(e.target)) {
+            closePanel();
+          }
+        });
+      })();
+    </script>
 </body>
 
 </html>

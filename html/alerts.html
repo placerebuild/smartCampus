@@ -24,12 +24,51 @@
         </div>
     </nav>
     <div class="main-content">
-        <div class="d-flex justify-content-between align-items-center mb-3">
-            <h5 class="section-heading mb-0">Alert History</h5>
-            <button class="btn btn-outline-secondary btn-sm" onclick="exportAlertsCSV()">
-                <i class="fas fa-download me-1"></i>Export CSV
-            </button>
+
+        <!-- Alerts Hero -->
+        <div class="alerts-hero mb-4">
+            <div class="alerts-hero-left">
+                <div class="alerts-hero-eyebrow"><i class="fas fa-bell me-1"></i>Monitoring</div>
+                <h4 class="alerts-hero-title">Alert History</h4>
+                <p class="alerts-hero-sub mb-0">All network incidents, severity levels, and resolution status across the campus infrastructure.</p>
+                <div class="alerts-hero-stats">
+                    <div class="alerts-stat-pill">
+                        <span class="alerts-stat-value" id="ah-total">--</span>
+                        <span class="alerts-stat-label">Total Today</span>
+                    </div>
+                    <div class="alerts-stat-pill alerts-stat-high">
+                        <span class="alerts-stat-value" id="ah-high">--</span>
+                        <span class="alerts-stat-label">High</span>
+                    </div>
+                    <div class="alerts-stat-pill alerts-stat-warn">
+                        <span class="alerts-stat-value" id="ah-warn">--</span>
+                        <span class="alerts-stat-label">Warning</span>
+                    </div>
+                    <div class="alerts-stat-pill alerts-stat-open">
+                        <span class="alerts-stat-value" id="ah-open">--</span>
+                        <span class="alerts-stat-label">Open</span>
+                    </div>
+                </div>
+            </div>
+            <div class="alerts-hero-right">
+                <button class="btn alerts-export-btn" onclick="exportAlertsCSV()">
+                    <i class="fas fa-download me-1"></i>Export CSV
+                </button>
+                <div class="alerts-filter-wrap">
+                    <button class="alerts-filter-btn active" id="af-today">
+                        <i class="fas fa-calendar-day me-1"></i>Today
+                    </button>
+                    <button class="alerts-filter-btn" id="af-all">
+                        <i class="fas fa-list me-1"></i>All Alerts
+                    </button>
+                </div>
+            </div>
         </div>
+
+        <div class="d-flex align-items-center justify-content-between mb-2 px-1">
+            <span class="text-muted small" id="ah-table-count"></span>
+        </div>
+
         <div class="card panel-card p-3">
             <table class="table table-hover" id="alerts-table">
                 <thead>
@@ -45,6 +84,9 @@
                 </thead>
                 <tbody></tbody>
             </table>
+            <div id="ah-table-toggle-row" class="text-center pt-2 pb-1 border-top" style="display:none;">
+                <button id="ah-table-toggle-btn" class="btn btn-sm btn-outline-secondary px-4">Show All</button>
+            </div>
         </div>
     </div>
     <!-- View Resolution Notes Modal -->

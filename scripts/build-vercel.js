@@ -27,13 +27,5 @@ const supabaseConfigLines = [
 
 fs.writeFileSync(path.join(output, 'runtime-config.js'), `window.SMARTCAMPUS_CLOUD = true;
 ${supabaseConfigLines}
-document.addEventListener('DOMContentLoaded', () => {
-  if (/login|signup|mainpage/.test(location.pathname)) return;
-  const notice = document.createElement('div');
-  notice.className = 'alert alert-info rounded-0 mb-0 text-center small';
-  notice.setAttribute('role', 'status');
-  notice.textContent = 'Cloud dashboard: showing the latest saved data. Live network scans run on the campus computer.';
-  document.body.prepend(notice);
-});
 `);
 console.log('Vercel public assets prepared.');

@@ -26,22 +26,44 @@
         
     </nav>
     <div class="main-content">
-        <h5 class="section-heading">Device Inventory</h5>
-        <p class="text-muted mb-3">Campus network devices (IC Building for now). Data will be loaded from the database
-            once the device list is provided.</p>
-        <div class="card panel-card p-3 mb-3" id="live-scan-panel">
-            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
-                <div>
-                    <h6 class="section-title mb-1">Live Scanning</h6>
-                    <span id="scan-state-text" class="small fw-semibold scan-state-pill scan-state-pill--idle">Ready</span>
+
+        <!-- Hero banner -->
+        <div class="devices-hero mb-4">
+            <div class="devices-hero-text">
+                <div class="devices-hero-eyebrow">Network Inventory</div>
+                <h4 class="devices-hero-title">Device Inventory</h4>
+                <p class="devices-hero-sub mb-0">All discovered campus network devices — monitored in real time via ICMP ping and SNMP.</p>
+            </div>
+            <div class="devices-hero-right">
+                <div class="devices-hero-stats">
+                    <div class="dstat-pill">
+                        <span class="dstat-value" id="dv-total">--</span>
+                        <span class="dstat-label">Total</span>
+                    </div>
+                    <div class="dstat-pill dstat-online">
+                        <span class="dstat-value" id="dv-online">--</span>
+                        <span class="dstat-label">Online</span>
+                    </div>
+                    <div class="dstat-pill dstat-offline">
+                        <span class="dstat-value" id="dv-offline">--</span>
+                        <span class="dstat-label">Offline</span>
+                    </div>
                 </div>
-                <div class="d-flex align-items-center gap-2">
-                    <span id="scan-realtime-indicator" class="status-pill scan-realtime-pill"><i class="fas fa-circle"></i> Live</span>
-                    <button id="start-scan-btn" class="btn btn-primary btn-sm" type="button"><i class="fas fa-satellite-dish me-1"></i>Start Live Scan</button>
+                <div class="dv-filter-wrap">
+                    <button class="dv-filter-btn active" id="dv-filter-today" title="Show only devices detected today">
+                        <i class="fas fa-calendar-day me-1"></i>Today
+                    </button>
+                    <button class="dv-filter-btn" id="dv-filter-all" title="Show all devices">
+                        <i class="fas fa-list me-1"></i>All Devices
+                    </button>
                 </div>
             </div>
-            <div id="scan-summary" class="small text-muted mt-2"></div>
         </div>
+
+        <div class="d-flex align-items-center justify-content-between mb-2 px-1">
+            <span class="text-muted small" id="dv-table-count"></span>
+        </div>
+
         <div class="card panel-card p-3">
             <div class="table-responsive">
                 <table class="table table-hover align-middle" id="devices-table">
@@ -59,6 +81,9 @@
                     </thead>
                     <tbody></tbody>
                 </table>
+            </div>
+            <div id="dv-table-toggle-row" class="text-center pt-2 pb-1 border-top" style="display:none;">
+                <button id="dv-table-toggle-btn" class="btn btn-sm btn-outline-secondary px-4">Show All</button>
             </div>
         </div>
     </div>

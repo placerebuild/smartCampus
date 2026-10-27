@@ -26,38 +26,48 @@
         </div>
     </nav>
     <div class="main-content">
-        <h5 class="section-heading">Network Topology Map</h5>
-        <p class="text-muted topology-help">Logical campus map with live device status and connection paths.</p>
-
-        <div class="card panel-card p-3 mb-3 topology-toolbar">
-            <div class="row g-2 align-items-end">
-                <div class="col-12 col-md-3">
-                    <label for="topology-view-mode" class="form-label mb-1">View Mode</label>
-                    <select id="topology-view-mode" class="form-select">
+        <!-- Topology Hero -->
+        <div class="topo-hero mb-4">
+            <div class="topo-hero-top">
+                <div class="topo-hero-text">
+                    <div class="topo-hero-eyebrow"><i class="fas fa-project-diagram me-1"></i>Network Topology</div>
+                    <h4 class="topo-hero-title">Network Topology Map</h4>
+                    <p class="topo-hero-sub mb-0">Logical campus map with live device status and connection paths.</p>
+                </div>
+                <div class="topo-hero-chips">
+                    <span class="topo-hero-chip"><i class="fas fa-map-marked-alt me-1"></i>Live Map</span>
+                    <span class="topo-hero-chip"><i class="fas fa-sitemap me-1"></i>Node Graph</span>
+                    <span class="topo-hero-chip"><i class="fas fa-sync-alt me-1"></i>Real-time</span>
+                </div>
+            </div>
+            <div class="topo-hero-controls">
+                <div class="topo-control-group">
+                    <label class="topo-control-label" for="topology-view-mode"><i class="fas fa-layer-group me-1"></i>View Mode</label>
+                    <select id="topology-view-mode" class="topo-select">
                         <option value="buildings" selected>Buildings View</option>
                         <option value="logical">Topology Map</option>
                         <option value="floor">Floor-based Map</option>
                         <option value="realtime">Real-time Map</option>
                     </select>
                 </div>
-                <div class="col-12 col-md-3">
-                    <label for="building-filter" class="form-label mb-1">Building Zone</label>
-                    <select id="building-filter" class="form-select">
+                <div class="topo-control-group">
+                    <label class="topo-control-label" for="building-filter"><i class="fas fa-building me-1"></i>Building Zone</label>
+                    <select id="building-filter" class="topo-select">
                         <option value="all" selected>All Buildings</option>
                     </select>
                 </div>
-                <div class="col-12 col-md-3">
-                    <label for="status-filter" class="form-label mb-1">Operational Status</label>
-                    <select id="status-filter" class="form-select">
+                <div class="topo-control-group">
+                    <label class="topo-control-label" for="status-filter"><i class="fas fa-signal me-1"></i>Operational Status</label>
+                    <select id="status-filter" class="topo-select">
                         <option value="all">All Statuses</option>
                         <option value="Online">Online</option>
                         <option value="Offline">Offline</option>
                         <option value="Warning">Warning</option>
                     </select>
                 </div>
-                <div class="col-12 col-md-3" id="device-type-filter-col">
-                    <label for="device-type-filter" class="form-label mb-1">Device Type</label>
-                    <select id="device-type-filter" class="form-select">
+                <div class="topo-control-group" id="device-type-filter-col">
+                    <label class="topo-control-label" for="device-type-filter"><i class="fas fa-server me-1"></i>Device Type</label>
+                    <select id="device-type-filter" class="topo-select">
                         <option value="all">All Devices</option>
                         <option value="router">Modem/Router</option>
                         <option value="phone">Phone</option>
@@ -67,8 +77,11 @@
                         <option value="unknown">Unknown</option>
                     </select>
                 </div>
-                <div class="col-12 col-md-3 d-grid" id="reset-btn-col">
-                    <button id="reset-topology-btn" class="btn btn-outline-primary">Reset Map View</button>
+                <div class="topo-control-group" id="reset-btn-col">
+                    <label class="topo-control-label" style="visibility:hidden;">Reset</label>
+                    <button id="reset-topology-btn" class="topo-reset-btn">
+                        <i class="fas fa-undo me-1"></i>Reset View
+                    </button>
                 </div>
             </div>
         </div>

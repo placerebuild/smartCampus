@@ -247,19 +247,11 @@
 
   // ── Render: Device Performance Table ────────────────────────────────────────
 
-  function renderDevicePerformanceTable(data) {
-    const tbody = document.querySelector('#device-perf-table tbody');
-    if (!tbody) return;
+  const PERF_TABLE_PAGE = 10;
+  let perfTableExpanded = false;
 
-    const devices = data.devices || [];
-    lastPerfDevices = devices;
-
-    if (devices.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4">No data available for this period.</td></tr>';
-      return;
-    }
-
-    tbody.innerHTML = devices.map(d => {
+  function buildPerfRows(devices) {
+    return devices.map(d => {
       const uptime = d.uptimePct !== null ? d.uptimePct : null;
       let uptimeBadge;
       if (uptime === null) {
@@ -271,17 +263,13 @@
       } else {
         uptimeBadge = `<span class="badge bg-danger">${uptime}%</span>`;
       }
-
       const latency = d.avgLatencyMs !== null
         ? `<span style="color:${latencyColor(d.avgLatencyMs)};font-weight:600;">${d.avgLatencyMs} ms</span>`
         : '—';
-
       const location = [d.building, d.floor].filter(Boolean).join(' / ') || '—';
-
       const alertBadge = d.alertCount > 0
         ? `<span class="badge bg-danger">${d.alertCount}</span>`
         : '<span class="badge bg-secondary">0</span>';
-
       return `<tr>
         <td><strong>${escapeHtml(d.name)}</strong><br><small class="text-muted">${escapeHtml(d.ip)}</small></td>
         <td><span class="badge bg-light text-dark border">${escapeHtml(d.type || '—')}</span></td>
@@ -291,6 +279,50 @@
         <td>${alertBadge}</td>
       </tr>`;
     }).join('');
+  }
+
+  function renderDevicePerformanceTable(data) {
+    const tbody = document.querySelector('#device-perf-table tbody');
+    const toggleRow = document.getElementById('perf-table-toggle-row');
+    const toggleBtn = document.getElementById('perf-table-toggle-btn');
+    const toggleLabel = document.getElementById('perf-table-toggle-label');
+    const toggleIcon = document.getElementById('perf-table-toggle-icon');
+    if (!tbody) return;
+
+    const devices = data.devices || [];
+    lastPerfDevices = devices;
+    perfTableExpanded = false;
+
+    if (devices.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4">No data available for this period.</td></tr>';
+      if (toggleRow) toggleRow.style.display = 'none';
+      return;
+    }
+
+    const visible = devices.slice(0, PERF_TABLE_PAGE);
+    tbody.innerHTML = buildPerfRows(visible);
+
+    if (toggleRow) {
+      if (devices.length > PERF_TABLE_PAGE) {
+        toggleRow.style.display = '';
+        const hidden = devices.length - PERF_TABLE_PAGE;
+        if (toggleLabel) toggleLabel.textContent = `Show All Devices (${hidden} more)`;
+        if (toggleIcon) toggleIcon.className = 'fas fa-chevron-down me-1';
+      } else {
+        toggleRow.style.display = 'none';
+      }
+    }
+
+    if (toggleBtn && !toggleBtn._perfBound) {
+      toggleBtn._perfBound = true;
+      toggleBtn.addEventListener('click', () => {
+        perfTableExpanded = !perfTableExpanded;
+        tbody.innerHTML = buildPerfRows(perfTableExpanded ? lastPerfDevices : lastPerfDevices.slice(0, PERF_TABLE_PAGE));
+        const hidden = lastPerfDevices.length - PERF_TABLE_PAGE;
+        if (toggleLabel) toggleLabel.textContent = perfTableExpanded ? 'Show Less' : `Show All Devices (${hidden} more)`;
+        if (toggleIcon) toggleIcon.className = perfTableExpanded ? 'fas fa-chevron-up me-1' : 'fas fa-chevron-down me-1';
+      });
+    }
   }
 
   // ── Render: Trend KPI Cards ──────────────────────────────────────────────────
@@ -479,9 +511,6 @@
       return 'rgba(31,122,224,0.75)';
     });
 
-    const barThickness = Math.max(18, Math.min(32, Math.floor(280 / devices.length)));
-    canvas.height = devices.length * (barThickness + 14) + 52;
-
     if (topDevicesChart) {
       topDevicesChart.data.labels = labels;
       topDevicesChart.data.datasets[0].data = alertCounts;
@@ -492,10 +521,10 @@
 
     topDevicesChart = new Chart(canvas, {
       type: 'bar',
-      data: { labels, datasets: [{ label: 'Total Alerts', data: alertCounts, backgroundColor: bgColors, borderRadius: { topRight: 4, bottomRight: 4 }, borderSkipped: false, barThickness }] },
+      data: { labels, datasets: [{ label: 'Total Alerts', data: alertCounts, backgroundColor: bgColors, borderRadius: { topRight: 4, bottomRight: 4 }, borderSkipped: false, maxBarThickness: 24 }] },
       options: {
         indexAxis: 'y',
-        responsive: false,
+        responsive: true,
         maintainAspectRatio: false,
         plugins: {
           legend: { display: false },
@@ -547,9 +576,6 @@
     const downtimes    = locs.map(l => Number((100 - l.uptimePct).toFixed(1)));
     const uptimeColors = uptimes.map(v => v >= 90 ? '#18a368' : v >= 70 ? '#f09a35' : '#de5b54');
 
-    const barThickness = Math.max(22, Math.min(36, Math.floor(300 / locs.length)));
-    canvas.height = locs.length * (barThickness + 14) + 56;
-
     if (locationChart) {
       locationChart.data.labels = labels;
       locationChart.data.datasets[0].data = uptimes;
@@ -564,13 +590,13 @@
       data: {
         labels,
         datasets: [
-          { label: 'Uptime', data: uptimes, backgroundColor: uptimeColors, borderRadius: { topRight: 4, bottomRight: 4 }, borderSkipped: false, barThickness },
-          { label: 'Downtime', data: downtimes, backgroundColor: 'rgba(222,91,84,0.22)', borderWidth: 0, borderRadius: { topRight: 4, bottomRight: 4 }, borderSkipped: false, barThickness }
+          { label: 'Uptime', data: uptimes, backgroundColor: uptimeColors, borderRadius: { topRight: 4, bottomRight: 4 }, borderSkipped: false, maxBarThickness: 26 },
+          { label: 'Downtime', data: downtimes, backgroundColor: 'rgba(222,91,84,0.22)', borderWidth: 0, borderRadius: { topRight: 4, bottomRight: 4 }, borderSkipped: false, maxBarThickness: 26 }
         ]
       },
       options: {
         indexAxis: 'y',
-        responsive: false,
+        responsive: true,
         maintainAspectRatio: false,
         plugins: {
           legend: {
@@ -725,9 +751,6 @@
     const uptimeColors  = uptimes.map(v => v >= 90 ? '#18a368' : v >= 70 ? '#f09a35' : '#de5b54');
     const downtimeColors = downtimes.map(() => 'rgba(222,91,84,0.25)');
 
-    const barThickness = Math.max(16, Math.min(32, Math.floor(320 / sorted.length)));
-    canvas.height = sorted.length * (barThickness + 12) + 60;
-
     if (uptimeBarChart) {
       uptimeBarChart.data.labels = labels;
       uptimeBarChart.data.datasets[0].data = uptimes;
@@ -749,7 +772,7 @@
             backgroundColor: uptimeColors,
             borderRadius: { topRight: 4, bottomRight: 4 },
             borderSkipped: false,
-            barThickness
+            maxBarThickness: 22
           },
           {
             label: 'Downtime',
@@ -758,13 +781,13 @@
             borderWidth: 0,
             borderRadius: { topRight: 4, bottomRight: 4 },
             borderSkipped: false,
-            barThickness
+            maxBarThickness: 22
           }
         ]
       },
       options: {
         indexAxis: 'y',
-        responsive: false,
+        responsive: true,
         maintainAspectRatio: false,
         plugins: {
           legend: {
@@ -870,7 +893,7 @@
   // ── Period tab handler ───────────────────────────────────────────────────────
 
   function initPeriodTabs() {
-    const tabs = document.querySelectorAll('#period-tabs .nav-link');
+    const tabs = document.querySelectorAll('#period-tabs .period-tab');
     tabs.forEach(btn => {
       btn.addEventListener('click', () => {
         tabs.forEach(b => b.classList.remove('active'));

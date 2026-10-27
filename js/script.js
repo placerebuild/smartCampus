@@ -1,4 +1,7 @@
 let devicesData = [];
+let deviceTableFilter = 'today'; // 'today' | 'all'
+let deviceTableExpanded = false;
+const DEVICE_TABLE_PAGE = 15;
 
 function escapeHtml(str) {
     return String(str == null ? '' : str)
@@ -91,8 +94,16 @@ function applyDeviceResults(devices) {
     if (!Array.isArray(devices)) return;
     devicesData = devices.map(device => ({
         ...device,
+        lastSeenRaw: device.lastSeen,
         lastSeen: formatLastSeen(device.lastSeen)
     }));
+    // Update devices-page hero stat pills if present
+    const dvTotal   = document.getElementById('dv-total');
+    const dvOnline  = document.getElementById('dv-online');
+    const dvOffline = document.getElementById('dv-offline');
+    if (dvTotal)   dvTotal.textContent   = devicesData.length;
+    if (dvOnline)  dvOnline.textContent  = devicesData.filter(d => d.status === 'Online').length;
+    if (dvOffline) dvOffline.textContent = devicesData.filter(d => d.status === 'Offline').length;
     populateDevicesTable();
     setTopologyDevices(devices);
     updateTopologyData({ fit: false });
@@ -108,8 +119,42 @@ function populateDevicesTable() {
     const tbody = document.querySelector('#devices-table tbody');
     if (!tbody) return;
 
+    let rows = devicesData;
+    if (deviceTableFilter === 'today') {
+        const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+        const filtered = devicesData.filter(d => d.lastSeenRaw && new Date(d.lastSeenRaw) >= todayStart);
+        rows = filtered.length > 0 ? filtered : devicesData;
+    }
+
+    // update visible count label
+    const countEl = document.getElementById('dv-table-count');
+    if (countEl) {
+        countEl.textContent = deviceTableFilter === 'today'
+            ? `${rows.length} detected today`
+            : `${rows.length} total`;
+    }
+
+    const displayRows = deviceTableExpanded ? rows : rows.slice(0, DEVICE_TABLE_PAGE);
+    const hiddenCount = rows.length - displayRows.length;
+
+    // update show-all toggle row
+    const toggleRow = document.getElementById('dv-table-toggle-row');
+    if (toggleRow) {
+        if (hiddenCount > 0 || deviceTableExpanded) {
+            toggleRow.style.display = '';
+            const toggleBtn = document.getElementById('dv-table-toggle-btn');
+            if (toggleBtn) {
+                toggleBtn.textContent = deviceTableExpanded
+                    ? 'Show Less'
+                    : `Show All (${hiddenCount} more)`;
+            }
+        } else {
+            toggleRow.style.display = 'none';
+        }
+    }
+
     tbody.innerHTML = '';
-    devicesData.forEach(dev => {
+    displayRows.forEach(dev => {
         const statusHTML = buildStatusMarkup(dev.status);
         const deviceKey = getDeviceKey(dev);
         const macValue = formatDeviceValue(dev.mac);
@@ -685,27 +730,62 @@ function initDeviceTableActions() {
 }
 
 let alertsData = [];
+let alertTableFilter = 'today'; // 'today' | 'all'
+let alertTableExpanded = false;
+const ALERT_TABLE_PAGE = 15;
+
+function countTodayAlerts() {
+    const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+    return alertsData.filter(a => a.time && new Date(a.time) >= todayStart).length;
+}
+
+function _pulseStatEl(el, newVal) {
+    if (!el) return;
+    const prev = el.textContent;
+    el.textContent = newVal;
+    if (String(prev) !== String(newVal)) {
+        el.classList.remove('stat-pulse');
+        void el.offsetWidth; // reflow to restart animation
+        el.classList.add('stat-pulse');
+    }
+}
+
+function updateStatCards() {
+    const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+    const seenToday = devicesData.filter(d => d.lastSeenRaw && new Date(d.lastSeenRaw) >= todayStart);
+    const useToday  = seenToday.length > 0;
+    const pool      = useToday ? seenToday : devicesData;
+    const online    = pool.filter(d => d.status === 'Online').length;
+    const offline   = pool.filter(d => d.status === 'Offline').length;
+    const unknown   = Math.max(0, pool.length - online - offline);
+
+    _pulseStatEl(document.getElementById('total-devices'), pool.length);
+    _pulseStatEl(document.getElementById('online-count'),  online);
+    _pulseStatEl(document.getElementById('offline-count'), offline);
+    _pulseStatEl(document.getElementById('alerts-today'),  countTodayAlerts());
+
+    if (typeof window.createStatusChart === 'function') {
+        window.createStatusChart(online, offline, unknown);
+    }
+}
 
 function setDevicesData(devices) {
     devicesData = Array.isArray(devices) ? devices : [];
     populateDevicesTable();
+    updateStatCards();
+}
 
-    const onlineCount  = devicesData.filter(d => d.status === 'Online').length;
-    const offlineCount = devicesData.filter(d => d.status === 'Offline').length;
-    const unknownCount = Math.max(0, devicesData.length - onlineCount - offlineCount);
-    if (typeof window.createStatusChart === 'function') {
-        window.createStatusChart(onlineCount, offlineCount, unknownCount);
-    }
-    const totalEl   = document.getElementById('total-devices');
-    const onlineEl  = document.getElementById('online-count');
-    const offlineEl = document.getElementById('offline-count');
-    if (totalEl)  totalEl.textContent  = devicesData.length;
-    if (onlineEl) onlineEl.textContent = onlineCount;
-    if (offlineEl) offlineEl.textContent = offlineCount;
+function updateAlertBadge() {
+    const badge = document.getElementById('alert-count');
+    if (!badge) return;
+    const unresolved = alertsData.filter(a => !a.resolved).length;
+    badge.textContent = unresolved > 0 ? (unresolved > 99 ? '99+' : unresolved) : '';
+    badge.style.display = unresolved > 0 ? '' : 'none';
 }
 
 function setAlertsData(alerts) {
     alertsData = Array.isArray(alerts) ? alerts : [];
+    updateAlertBadge();
 }
 
 function populateRecentAlerts() {
@@ -728,31 +808,83 @@ async function populateAlertsTable() {
 
     try {
         const res = await fetch(getTopologyApiBase() + '/api/alerts', { credentials: 'include' });
-        if (res.ok) alertsData = await res.json();
+        if (res.ok) {
+            alertsData = await res.json();
+            updateAlertBadge();
+            if (typeof updateStatCards === 'function') updateStatCards();
+        }
     } catch (e) { /* keep alertsData as-is */ }
 
-    tbody.innerHTML = alertsData.map(a => {
-        const label = a.severity === 'danger' ? 'High' : a.severity === 'warning' ? 'Warning' : 'Info';
-        const badgeClass = a.severity === 'danger' ? 'danger' : a.severity === 'warning' ? 'warning' : 'success';
-        const statusBadge = a.resolved
-            ? `<span class="badge bg-success">Resolved</span>`
-            : '<span class="badge bg-secondary">Open</span>';
-        const notesCell = a.resolutionNotes
-            ? `<button class="btn btn-sm btn-outline-secondary" onclick="viewResolutionNotes(${a.id})"><i class="fas fa-eye me-1"></i>View</button>`
-            : `<span class="text-muted small">—</span>`;
-        const actionBtn = a.resolved
-            ? ''
-            : `<button class="btn btn-sm btn-outline-success" onclick="openResolveModal(${a.id}, '${escapeHtml(a.device)}', '${escapeHtml(a.issue)}')"><i class="fas fa-check me-1"></i>Resolve</button>`;
-        return `<tr data-alert-id="${a.id}">
-            <td>${new Date(a.time).toLocaleString()}</td>
-            <td>${escapeHtml(a.device)}</td>
-            <td>${escapeHtml(a.issue)}</td>
-            <td><span class="badge bg-${badgeClass}">${label}</span></td>
-            <td>${statusBadge}</td>
-            <td>${notesCell}</td>
-            <td>${actionBtn}</td>
-        </tr>`;
-    }).join('');
+    // Filter by today or all
+    const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+    const visibleAlerts = alertTableFilter === 'today'
+        ? alertsData.filter(a => a.time && new Date(a.time) >= todayStart)
+        : alertsData;
+
+    // Update hero stat chips
+    const ahTotal = document.getElementById('ah-total');
+    const ahHigh  = document.getElementById('ah-high');
+    const ahWarn  = document.getElementById('ah-warn');
+    const ahOpen  = document.getElementById('ah-open');
+    const todayAlerts = alertsData.filter(a => a.time && new Date(a.time) >= todayStart);
+    if (ahTotal) ahTotal.textContent = todayAlerts.length;
+    if (ahHigh)  ahHigh.textContent  = todayAlerts.filter(a => a.severity === 'danger' || a.severity === 'High').length;
+    if (ahWarn)  ahWarn.textContent  = todayAlerts.filter(a => a.severity === 'warning' || a.severity === 'Warning').length;
+    if (ahOpen)  ahOpen.textContent  = todayAlerts.filter(a => !a.resolved).length;
+
+    // Apply page limit
+    const displayAlerts = alertTableExpanded ? visibleAlerts : visibleAlerts.slice(0, ALERT_TABLE_PAGE);
+    const hiddenCount   = visibleAlerts.length - displayAlerts.length;
+
+    // Update toggle row
+    const toggleRow = document.getElementById('ah-table-toggle-row');
+    if (toggleRow) {
+        if (hiddenCount > 0 || alertTableExpanded) {
+            toggleRow.style.display = '';
+            const toggleBtn = document.getElementById('ah-table-toggle-btn');
+            if (toggleBtn) {
+                toggleBtn.textContent = alertTableExpanded
+                    ? 'Show Less'
+                    : `Show All (${hiddenCount} more)`;
+            }
+        } else {
+            toggleRow.style.display = 'none';
+        }
+    }
+
+    // Update table count label
+    const countEl = document.getElementById('ah-table-count');
+    if (countEl) {
+        countEl.textContent = alertTableFilter === 'today'
+            ? `${visibleAlerts.length} alert${visibleAlerts.length !== 1 ? 's' : ''} today`
+            : `${visibleAlerts.length} alert${visibleAlerts.length !== 1 ? 's' : ''} total`;
+    }
+
+    tbody.innerHTML = displayAlerts.length === 0
+        ? `<tr><td colspan="7" class="text-center text-muted py-4"><i class="fas fa-check-circle me-2 text-success"></i>No alerts${alertTableFilter === 'today' ? ' today' : ''}</td></tr>`
+        : displayAlerts.map(a => {
+            const label      = a.severity === 'danger' || a.severity === 'High' ? 'High'
+                             : a.severity === 'warning' || a.severity === 'Warning' ? 'Warning' : 'Info';
+            const badgeClass = label === 'High' ? 'danger' : label === 'Warning' ? 'warning' : 'success';
+            const statusBadge = a.resolved
+                ? `<span class="badge bg-success">Resolved</span>`
+                : '<span class="badge bg-secondary">Open</span>';
+            const notesCell = a.resolutionNotes
+                ? `<button class="btn btn-sm btn-outline-secondary" onclick="viewResolutionNotes(${a.id})"><i class="fas fa-eye me-1"></i>View</button>`
+                : `<span class="text-muted small">—</span>`;
+            const actionBtn = a.resolved
+                ? ''
+                : `<button class="btn btn-sm btn-outline-success" onclick="openResolveModal(${a.id}, '${escapeHtml(a.device)}', '${escapeHtml(a.issue)}')"><i class="fas fa-check me-1"></i>Resolve</button>`;
+            return `<tr data-alert-id="${a.id}">
+                <td>${new Date(a.time).toLocaleString()}</td>
+                <td><strong>${escapeHtml(a.device)}</strong></td>
+                <td>${escapeHtml(a.issue)}</td>
+                <td><span class="badge bg-${badgeClass}">${label}</span></td>
+                <td>${statusBadge}</td>
+                <td>${notesCell}</td>
+                <td>${actionBtn}</td>
+            </tr>`;
+        }).join('');
 }
 
 // State for the resolve modal
@@ -803,6 +935,8 @@ async function submitResolve() {
             row.cells[6].innerHTML = '';
             const entry = alertsData.find(item => item.id === alertId);
             if (entry) { entry.resolved = true; entry.resolvedAt = data.resolvedAt; entry.resolvedBy = data.resolvedBy; entry.resolutionNotes = data.resolutionNotes; }
+            updateAlertBadge();
+            if (typeof updateStatCards === 'function') updateStatCards();
         }
     } catch (e) {
         console.error('Failed to resolve alert:', e);
@@ -1143,7 +1277,7 @@ function matchesDeviceTypeFilter(device, filterValue) {
         case 'pc':      return t.includes('pc') || t.includes('workstation') || t.includes('desktop') || t.includes('computer');
         case 'switch':  return t.includes('switch');
         case 'ap':      return t.includes('ap') || t.includes('wifi') || t.includes('wireless') || t.includes('access');
-        case 'unknown': return true;
+        case 'unknown': return !isKnownDeviceType(device.type);
         default:        return true;
     }
 }
@@ -1251,17 +1385,72 @@ function getTopologyFilters() {
 }
 
 function initTopologyFilters() {
-    const buildingFilter = document.getElementById('building-filter');
-    if (!buildingFilter) return;
+    const buildingFilter    = document.getElementById('building-filter');
+    const statusFilter      = document.getElementById('status-filter');
+    const deviceTypeFilter  = document.getElementById('device-type-filter');
 
-    const buildings = [...new Set(campusDevices.map(device => device.building))].sort((a, b) =>
-        a.localeCompare(b)
-    );
+    // Buildings — only real names, sorted
+    if (buildingFilter) {
+        const buildings = [...new Set(
+            campusDevices.map(d => d.building).filter(b => b && b.trim())
+        )].sort((a, b) => a.localeCompare(b));
 
-    buildingFilter.innerHTML = `
-        <option value="all" selected>All Buildings</option>
-        ${buildings.map(building => `<option value="${building}">${building}</option>`).join('')}
-    `;
+        const savedBuilding = buildingFilter.value;
+        buildingFilter.innerHTML =
+            `<option value="all">All Buildings (${campusDevices.length})</option>` +
+            buildings.map(b => {
+                const count = campusDevices.filter(d => d.building === b).length;
+                return `<option value="${escapeHtml(b)}">${escapeHtml(b)} (${count})</option>`;
+            }).join('');
+        if (savedBuilding && savedBuilding !== 'all') buildingFilter.value = savedBuilding;
+    }
+
+    // Status — derive from actual data, add counts
+    if (statusFilter) {
+        const statusCounts = { Online: 0, Offline: 0, Warning: 0 };
+        campusDevices.forEach(d => {
+            const s = d.status || 'Warning';
+            if (s in statusCounts) statusCounts[s]++;
+            else statusCounts.Warning++;
+        });
+        const total = campusDevices.length;
+        const savedStatus = statusFilter.value;
+        statusFilter.innerHTML = [
+            `<option value="all">All Statuses (${total})</option>`,
+            `<option value="Online">Online (${statusCounts.Online})</option>`,
+            `<option value="Offline">Offline (${statusCounts.Offline})</option>`,
+            `<option value="Warning">Warning / Unknown (${statusCounts.Warning})</option>`
+        ].join('');
+        if (savedStatus && savedStatus !== 'all') statusFilter.value = savedStatus;
+    }
+
+    // Device type — derive from actual data
+    if (deviceTypeFilter) {
+        const typeCounts = {
+            router: 0, phone: 0, pc: 0, switch: 0, ap: 0, unknown: 0
+        };
+        campusDevices.forEach(d => {
+            const t = (d.type || '').toLowerCase();
+            if (t.includes('router') || t.includes('modem') || t.includes('gateway')) typeCounts.router++;
+            else if (t.includes('phone') || t.includes('mobile') || t.includes('smartphone')) typeCounts.phone++;
+            else if (t.includes('pc') || t.includes('workstation') || t.includes('desktop') || t.includes('computer')) typeCounts.pc++;
+            else if (t.includes('switch')) typeCounts.switch++;
+            else if (t.includes('ap') || t.includes('wifi') || t.includes('wireless') || t.includes('access')) typeCounts.ap++;
+            else typeCounts.unknown++;
+        });
+        const total = campusDevices.length;
+        const savedType = deviceTypeFilter.value;
+        deviceTypeFilter.innerHTML = [
+            `<option value="all">All Devices (${total})</option>`,
+            `<option value="router">Modem / Router (${typeCounts.router})</option>`,
+            `<option value="phone">Phone (${typeCounts.phone})</option>`,
+            `<option value="pc">PC / Workstation (${typeCounts.pc})</option>`,
+            `<option value="switch">Switches (${typeCounts.switch})</option>`,
+            `<option value="ap">WiFi AP (${typeCounts.ap})</option>`,
+            `<option value="unknown">Unknown / Other (${typeCounts.unknown})</option>`
+        ].join('');
+        if (savedType && savedType !== 'all') deviceTypeFilter.value = savedType;
+    }
 }
 
 function normalizeTopologyPayload(payload) {
@@ -1992,11 +2181,13 @@ function startTopologyRealtime() {
             setTopologyDevices(normalized.devices);
             setTopologyLinks(normalized.links);
             updateTopologyData({ fit: false });
+            initTopologyFilters();
         });
 
         topologySocket.on('topology:devices', devices => {
             setTopologyDevices(devices);
             updateTopologyData({ fit: false });
+            initTopologyFilters();
         });
 
         topologySocket.on('topology:links', links => {
@@ -2421,8 +2612,8 @@ function populateDashboardAlerts(devices) {
     const offlineDevices = devices.filter(d => d.status === 'Offline');
     const alertsEl = document.getElementById('alerts-today');
 
-    if (alertsEl) {
-        alertsEl.textContent = offlineDevices.length;
+    if (alertsEl && typeof countTodayAlerts === 'function') {
+        alertsEl.textContent = countTodayAlerts();
     }
 
     if (offlineDevices.length === 0) {
@@ -2657,6 +2848,7 @@ function applyPingStreamResults(results) {
             const dev = devicesData.find(d => d.id === res.deviceId || d.ip === res.ip);
             if (dev) {
                 dev.status = newStatus;
+                dev.lastSeenRaw = res.time;
                 dev.lastSeen = formatLastSeen(res.time);
 
                 const deviceKey = getDeviceKey(dev);
@@ -2686,25 +2878,11 @@ function applyPingStreamResults(results) {
             updateTopologyData({ fit: false });
         }
 
-        devicesData.forEach(d => {
-            if (d.status === 'Online') onlineCount++;
-            else if (d.status === 'Offline') offlineCount++;
-            else unknownCount++;
-        });
-
-        const totalEl = document.getElementById('total-devices');
-        const onlineEl = document.getElementById('online-count');
-        const offlineEl = document.getElementById('offline-count');
-        const alertsEl = document.getElementById('alerts-today');
-
-        if (totalEl) totalEl.innerText = devicesData.length;
-        if (onlineEl) onlineEl.innerText = onlineCount;
-        if (offlineEl) offlineEl.innerText = offlineCount;
-        if (alertsEl) alertsEl.innerText = offlineCount;
-
-        if (typeof window.createStatusChart === 'function') {
-            window.createStatusChart(onlineCount, offlineCount, unknownCount);
-        }
+        if (typeof updateStatCards === 'function') updateStatCards();
+        const dvOnline  = document.getElementById('dv-online');
+        const dvOffline = document.getElementById('dv-offline');
+        if (dvOnline)  dvOnline.textContent  = devicesData.filter(d => d.status === 'Online').length;
+        if (dvOffline) dvOffline.textContent = devicesData.filter(d => d.status === 'Offline').length;
     }
 }
 
@@ -2721,6 +2899,7 @@ function initDashboardRealtime() {
             if (Array.isArray(devices)) {
                 setDevicesData(devices.map(d => ({
                     ...d,
+                    lastSeenRaw: d.lastSeen,
                     lastSeen: typeof formatLastSeen === 'function' ? formatLastSeen(d.lastSeen) : d.lastSeen
                 })));
             }
@@ -2739,13 +2918,18 @@ function initDashboardRealtime() {
 
             const toastId = 'toast-' + Date.now();
             const icon = alert.severity === 'danger' ? 'fa-exclamation-triangle' : (alert.severity === 'warning' ? 'fa-exclamation-circle' : 'fa-check-circle');
+            const severityLabel = alert.severity === 'danger' ? 'Critical' : alert.severity === 'warning' ? 'Warning' : 'Recovery';
             const toastHtml = `
-                <div id="${toastId}" class="toast align-items-center text-bg-${alert.severity} border-0" role="alert" aria-live="assertive" aria-atomic="true">
-                    <div class="d-flex">
-                        <div class="toast-body fw-semibold">
-                            <i class="fas ${icon} me-2"></i> ${alert.message}
-                        </div>
-                        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+                <div id="${toastId}" class="toast border-0 shadow-lg" role="alert" aria-live="assertive" aria-atomic="true" style="min-width:300px;max-width:380px;">
+                    <div class="toast-header text-bg-${alert.severity} border-0 rounded-top">
+                        <i class="fas ${icon} me-2"></i>
+                        <strong class="me-auto">${severityLabel} Alert</strong>
+                        <small class="opacity-75">${new Date(alert.time || Date.now()).toLocaleTimeString()}</small>
+                        <button type="button" class="btn-close btn-close-white ms-2" data-bs-dismiss="toast" aria-label="Close"></button>
+                    </div>
+                    <div class="toast-body fw-semibold" style="font-size:0.9rem;">
+                        ${alert.message || 'Alert triggered.'}
+                        ${alert.deviceName ? `<div class="text-muted small mt-1"><i class="fas fa-server me-1"></i>${alert.deviceName}</div>` : ''}
                     </div>
                 </div>
             `;
@@ -2762,9 +2946,8 @@ function initDashboardRealtime() {
             if (typeof bootstrap !== 'undefined') {
                 const bsToast = new bootstrap.Toast(toastEl, {
                     autohide: true,
-                    delay: 3000
+                    delay: 8000
                 });
-
                 bsToast.show();
                 toastEl.addEventListener('hidden.bs.toast', () => toastEl.remove());
             }
@@ -2803,6 +2986,11 @@ function initDashboardRealtime() {
                     <td><span class="badge bg-${badgeClass}">${label}</span></td>
                 </tr>`);
             }
+
+            // Keep alertsData in sync so badge + Alerts Today counter stay accurate
+            alertsData.unshift({ id: alert.id, time: alert.time, severity: alert.severity, resolved: false });
+            updateAlertBadge();
+            if (typeof updateStatCards === 'function') updateStatCards();
         });
     }
 
@@ -2854,6 +3042,64 @@ window.addEventListener('load', async function () {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ enabled: emailSwitch.checked })
             }).catch(() => {});
+        });
+    }
+
+    // Device table Today / All toggle
+    const filterToday = document.getElementById('dv-filter-today');
+    const filterAll   = document.getElementById('dv-filter-all');
+    if (filterToday && filterAll) {
+        filterToday.addEventListener('click', () => {
+            deviceTableFilter = 'today';
+            deviceTableExpanded = false;
+            filterToday.classList.add('active');
+            filterAll.classList.remove('active');
+            populateDevicesTable();
+        });
+        filterAll.addEventListener('click', () => {
+            deviceTableFilter = 'all';
+            deviceTableExpanded = false;
+            filterAll.classList.add('active');
+            filterToday.classList.remove('active');
+            populateDevicesTable();
+        });
+    }
+
+    // Device table Show All / Show Less toggle
+    const dvToggleBtn = document.getElementById('dv-table-toggle-btn');
+    if (dvToggleBtn) {
+        dvToggleBtn.addEventListener('click', () => {
+            deviceTableExpanded = !deviceTableExpanded;
+            populateDevicesTable();
+        });
+    }
+
+    // Alerts table Today / All toggle
+    const afToday = document.getElementById('af-today');
+    const afAll   = document.getElementById('af-all');
+    if (afToday && afAll) {
+        afToday.addEventListener('click', () => {
+            alertTableFilter = 'today';
+            alertTableExpanded = false;
+            afToday.classList.add('active');
+            afAll.classList.remove('active');
+            populateAlertsTable();
+        });
+        afAll.addEventListener('click', () => {
+            alertTableFilter = 'all';
+            alertTableExpanded = false;
+            afAll.classList.add('active');
+            afToday.classList.remove('active');
+            populateAlertsTable();
+        });
+    }
+
+    // Alerts table Show All / Show Less toggle
+    const ahToggleBtn = document.getElementById('ah-table-toggle-btn');
+    if (ahToggleBtn) {
+        ahToggleBtn.addEventListener('click', () => {
+            alertTableExpanded = !alertTableExpanded;
+            populateAlertsTable();
         });
     }
 

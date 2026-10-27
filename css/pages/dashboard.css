@@ -112,18 +112,28 @@ body.sidebar-layout {
 
 .top-navbar {
     margin-left: var(--sidebar-width);
-    background: rgba(255, 255, 255, 0.8);
-    backdrop-filter: blur(10px);
-    border-bottom: 1px solid var(--border-soft);
-    box-shadow: 0 8px 24px rgba(22, 48, 77, 0.08);
+    background: linear-gradient(90deg, rgba(12, 87, 41, 0.06) 0%, rgba(255, 255, 255, 0.92) 40%);
+    backdrop-filter: blur(12px);
+    border-bottom: 2px solid rgba(21, 138, 71, 0.35);
+    box-shadow: 0 4px 18px rgba(12, 87, 41, 0.1);
     position: sticky;
     top: 0;
     z-index: 1030;
     padding: 0.65rem 0;
 }
 
+#page-title {
+    font-family: 'Sora', sans-serif;
+    font-weight: 700;
+    font-size: 1rem;
+    color: #0c5729 !important;
+    letter-spacing: 0.01em;
+    border-left: 3px solid #1db862;
+    padding-left: 0.6rem;
+}
+
 .top-navbar .navbar-toggler {
-    border: 1px solid #c5d7eb;
+    border: 1px solid rgba(21, 138, 71, 0.35);
     border-radius: 10px;
 }
 
@@ -563,6 +573,19 @@ code {
     .topology-detail-card {
         min-height: auto;
     }
+}
+
+/* Real-time stat card pulse */
+@keyframes stat-pulse-anim {
+    0%   { opacity: 1; transform: scale(1); }
+    30%  { opacity: 0.6; transform: scale(1.08); }
+    60%  { opacity: 1; transform: scale(1.04); }
+    100% { opacity: 1; transform: scale(1); }
+}
+
+.stat-pulse {
+    animation: stat-pulse-anim 0.45s ease;
+    display: inline-block;
 }
 
 

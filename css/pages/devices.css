@@ -112,14 +112,24 @@ body.sidebar-layout {
 
 .top-navbar {
     margin-left: var(--sidebar-width);
-    background: rgba(255, 255, 255, 0.8);
-    backdrop-filter: blur(10px);
-    border-bottom: 1px solid var(--border-soft);
-    box-shadow: 0 8px 24px rgba(22, 48, 77, 0.08);
+    background: linear-gradient(90deg, rgba(12, 87, 41, 0.06) 0%, rgba(255, 255, 255, 0.92) 40%);
+    backdrop-filter: blur(12px);
+    border-bottom: 2px solid rgba(21, 138, 71, 0.35);
+    box-shadow: 0 4px 18px rgba(12, 87, 41, 0.1);
     position: sticky;
     top: 0;
     z-index: 1030;
     padding: 0.65rem 0;
+}
+
+#page-title {
+    font-family: 'Sora', sans-serif;
+    font-weight: 700;
+    font-size: 1rem;
+    color: #0c5729 !important;
+    letter-spacing: 0.01em;
+    border-left: 3px solid #1db862;
+    padding-left: 0.6rem;
 }
 
 .top-navbar .navbar-toggler {
@@ -651,6 +661,154 @@ code {
 
     .topology-detail-card {
         min-height: auto;
+    }
+}
+
+/* Device Inventory hero banner */
+.devices-hero {
+    border-radius: 18px;
+    background: linear-gradient(120deg, #0c5729 0%, #158a47 52%, #1db862 100%);
+    color: #f5fffa;
+    padding: 1.3rem 1.6rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1.2rem;
+    box-shadow: 0 14px 32px rgba(10, 63, 40, 0.3);
+    position: relative;
+    overflow: hidden;
+}
+
+.devices-hero::after {
+    content: '';
+    position: absolute;
+    width: 260px;
+    height: 260px;
+    right: -100px;
+    top: -130px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.12);
+    pointer-events: none;
+}
+
+.devices-hero-eyebrow {
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    font-size: 0.72rem;
+    font-weight: 700;
+    opacity: 0.85;
+    margin-bottom: 0.25rem;
+}
+
+.devices-hero-title {
+    font-family: 'Sora', sans-serif;
+    font-weight: 700;
+    font-size: 1.45rem;
+    margin: 0 0 0.3rem;
+}
+
+.devices-hero-sub {
+    font-size: 0.875rem;
+    color: rgba(240, 255, 248, 0.88);
+    max-width: 52ch;
+}
+
+.devices-hero-stats {
+    display: flex;
+    gap: 0.75rem;
+    flex-shrink: 0;
+    position: relative;
+    z-index: 1;
+}
+
+.dstat-pill {
+    background: rgba(255, 255, 255, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.28);
+    border-radius: 12px;
+    padding: 0.55rem 1rem;
+    text-align: center;
+    min-width: 64px;
+    backdrop-filter: blur(4px);
+}
+
+.dstat-pill.dstat-online  { background: rgba(24, 163, 104, 0.35); border-color: rgba(110, 240, 189, 0.45); }
+.dstat-pill.dstat-offline { background: rgba(222, 91, 84, 0.3);   border-color: rgba(240, 150, 145, 0.4); }
+
+.dstat-value {
+    display: block;
+    font-family: 'Sora', sans-serif;
+    font-weight: 700;
+    font-size: 1.5rem;
+    line-height: 1.1;
+    color: #fff;
+}
+
+.dstat-label {
+    display: block;
+    font-size: 0.68rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: rgba(240, 255, 248, 0.78);
+    margin-top: 0.15rem;
+}
+
+.devices-hero-right {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.75rem;
+    position: relative;
+    z-index: 1;
+}
+
+/* Today / All toggle */
+.dv-filter-wrap {
+    display: flex;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    border-radius: 10px;
+    padding: 3px;
+    gap: 3px;
+}
+
+.dv-filter-btn {
+    background: transparent;
+    border: none;
+    border-radius: 8px;
+    color: rgba(240, 255, 248, 0.8);
+    font-size: 0.8rem;
+    font-weight: 600;
+    padding: 0.32rem 0.9rem;
+    cursor: pointer;
+    transition: background 0.2s ease, color 0.2s ease;
+    white-space: nowrap;
+    font-family: inherit;
+}
+
+.dv-filter-btn:hover {
+    background: rgba(255, 255, 255, 0.14);
+    color: #fff;
+}
+
+.dv-filter-btn.active {
+    background: rgba(255, 255, 255, 0.22);
+    color: #ffffff;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.18);
+}
+
+@media (max-width: 640px) {
+    .devices-hero {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    .devices-hero-right {
+        align-items: flex-start;
+        width: 100%;
+    }
+    .devices-hero-stats {
+        width: 100%;
+        justify-content: space-between;
     }
 }
 

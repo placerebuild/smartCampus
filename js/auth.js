@@ -55,6 +55,12 @@ function applyUserToProfile(user) {
 
     if (displayNameEl) displayNameEl.textContent = displayName;
     if (displayRoleEl) displayRoleEl.textContent = user.role || 'Technical Staff';
+
+    // Sync hero banner chips
+    const heroNameEl = document.getElementById('profileHeroName');
+    const heroRoleEl = document.getElementById('profileHeroRole');
+    if (heroNameEl) heroNameEl.innerHTML = `<i class="fas fa-id-badge me-1"></i>${displayName}`;
+    if (heroRoleEl) heroRoleEl.innerHTML = `<i class="fas fa-shield-alt me-1"></i>${user.role || 'Technical Staff'}`;
     if (firstNameEl) firstNameEl.value = nameParts.firstName || '';
     if (lastNameEl) lastNameEl.value = nameParts.lastName || '';
     if (emailEl) emailEl.value = user.email || '';
