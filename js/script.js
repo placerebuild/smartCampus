@@ -2620,23 +2620,16 @@ async function initScanSettings() {
     });
 }
 
-function initDashboardRealtime() {
+// Shared handler for both Socket.IO (local) and Supabase Broadcast (cloud) ping streams.
+function applyPingStreamResults(results) {
     const pingStreamFeed = document.getElementById('ping-stream-feed');
-
-    if (!window.SMARTCAMPUS_CLOUD && typeof io === 'function') {
-        const dashboardSocket = io(getTopologyApiBase(), {
-            withCredentials: true,
-            transports: ['websocket', 'polling']
-        });
-
-        dashboardSocket.on('devices:ping_stream', (results) => {
-            if (pingStreamFeed) {
-                let html = '';
-                results.forEach(res => {
-                    const displayStatus = res.status || (res.alive ? 'Online' : 'Offline');
-                    const statusColor = displayStatus === 'Online' ? 'success' : 'danger';
-                    const latencyText = res.latencyMs !== null ? `${res.latencyMs.toFixed(1)} ms` : 'N/A';
-                    html += `
+    if (pingStreamFeed) {
+        let html = '';
+        results.forEach(res => {
+            const displayStatus = res.status || (res.alive ? 'Online' : 'Offline');
+            const statusColor = displayStatus === 'Online' ? 'success' : 'danger';
+            const latencyText = res.latencyMs !== null ? `${res.latencyMs.toFixed(1)} ms` : 'N/A';
+            html += `
                         <div class="list-group-item d-flex justify-content-between align-items-center py-2">
                             <div>
                                 <small class="fw-bold">${res.name || res.ip}</small><br>
@@ -2648,72 +2641,81 @@ function initDashboardRealtime() {
                             </div>
                         </div>
                     `;
-                });
-                pingStreamFeed.innerHTML = html;
+        });
+        pingStreamFeed.innerHTML = html;
+    }
+
+    // Real-time table updates
+    if (typeof devicesData !== 'undefined' && Array.isArray(devicesData)) {
+        let onlineCount = 0;
+        let offlineCount = 0;
+        let unknownCount = 0;
+        let topologyNeedsUpdate = false;
+
+        results.forEach(res => {
+            const newStatus = res.status || (res.alive ? 'Online' : 'Offline');
+            const dev = devicesData.find(d => d.id === res.deviceId || d.ip === res.ip);
+            if (dev) {
+                dev.status = newStatus;
+                dev.lastSeen = formatLastSeen(res.time);
+
+                const deviceKey = getDeviceKey(dev);
+                const row = document.querySelector(`tr[data-device-row="${deviceKey}"]`);
+                if (row) {
+                    const statusCell = row.querySelector('[data-status-cell]');
+                    if (statusCell) {
+                        statusCell.innerHTML = buildStatusMarkup(newStatus);
+                    }
+                    const lastSeenCell = row.querySelector('[data-last-seen-cell]');
+                    if (lastSeenCell) {
+                        lastSeenCell.innerText = formatDeviceValue(dev.lastSeen);
+                    }
+                }
             }
 
-            // Real-time table updates
-            if (typeof devicesData !== 'undefined' && Array.isArray(devicesData)) {
-                let onlineCount = 0;
-                let offlineCount = 0;
-                let unknownCount = 0;
-                let topologyNeedsUpdate = false;
-
-                results.forEach(res => {
-                    const newStatus = res.status || (res.alive ? 'Online' : 'Offline');
-                    const dev = devicesData.find(d => d.id === res.deviceId || d.ip === res.ip);
-                    if (dev) {
-                        dev.status = newStatus;
-                        dev.lastSeen = formatLastSeen(res.time);
-
-                        const deviceKey = getDeviceKey(dev);
-                        const row = document.querySelector(`tr[data-device-row="${deviceKey}"]`);
-                        if (row) {
-                            const statusCell = row.querySelector('[data-status-cell]');
-                            if (statusCell) {
-                                statusCell.innerHTML = buildStatusMarkup(newStatus);
-                            }
-                            const lastSeenCell = row.querySelector('[data-last-seen-cell]');
-                            if (lastSeenCell) {
-                                lastSeenCell.innerText = formatDeviceValue(dev.lastSeen);
-                            }
-                        }
-                    }
-
-                    if (typeof campusDevices !== 'undefined') {
-                        const topoDev = campusDevices.find(d => d.id === res.deviceId || d.ip === res.ip);
-                        if (topoDev && topoDev.status !== newStatus) {
-                            topoDev.status = newStatus;
-                            topologyNeedsUpdate = true;
-                        }
-                    }
-                });
-
-                if (topologyNeedsUpdate && typeof updateTopologyData === 'function') {
-                    updateTopologyData({ fit: false });
-                }
-
-                devicesData.forEach(d => {
-                    if (d.status === 'Online') onlineCount++;
-                    else if (d.status === 'Offline') offlineCount++;
-                    else unknownCount++;
-                });
-
-                const totalEl = document.getElementById('total-devices');
-                const onlineEl = document.getElementById('online-count');
-                const offlineEl = document.getElementById('offline-count');
-                const alertsEl = document.getElementById('alerts-today');
-
-                if (totalEl) totalEl.innerText = devicesData.length;
-                if (onlineEl) onlineEl.innerText = onlineCount;
-                if (offlineEl) offlineEl.innerText = offlineCount;
-                if (alertsEl) alertsEl.innerText = offlineCount;
-
-                if (typeof window.createStatusChart === 'function') {
-                    window.createStatusChart(onlineCount, offlineCount, unknownCount);
+            if (typeof campusDevices !== 'undefined') {
+                const topoDev = campusDevices.find(d => d.id === res.deviceId || d.ip === res.ip);
+                if (topoDev && topoDev.status !== newStatus) {
+                    topoDev.status = newStatus;
+                    topologyNeedsUpdate = true;
                 }
             }
         });
+
+        if (topologyNeedsUpdate && typeof updateTopologyData === 'function') {
+            updateTopologyData({ fit: false });
+        }
+
+        devicesData.forEach(d => {
+            if (d.status === 'Online') onlineCount++;
+            else if (d.status === 'Offline') offlineCount++;
+            else unknownCount++;
+        });
+
+        const totalEl = document.getElementById('total-devices');
+        const onlineEl = document.getElementById('online-count');
+        const offlineEl = document.getElementById('offline-count');
+        const alertsEl = document.getElementById('alerts-today');
+
+        if (totalEl) totalEl.innerText = devicesData.length;
+        if (onlineEl) onlineEl.innerText = onlineCount;
+        if (offlineEl) offlineEl.innerText = offlineCount;
+        if (alertsEl) alertsEl.innerText = offlineCount;
+
+        if (typeof window.createStatusChart === 'function') {
+            window.createStatusChart(onlineCount, offlineCount, unknownCount);
+        }
+    }
+}
+
+function initDashboardRealtime() {
+    if (!window.SMARTCAMPUS_CLOUD && typeof io === 'function') {
+        const dashboardSocket = io(getTopologyApiBase(), {
+            withCredentials: true,
+            transports: ['websocket', 'polling']
+        });
+
+        dashboardSocket.on('devices:ping_stream', applyPingStreamResults);
 
         dashboardSocket.on('devices:update', (devices) => {
             if (Array.isArray(devices)) {
@@ -2802,6 +2804,28 @@ function initDashboardRealtime() {
                 </tr>`);
             }
         });
+    }
+
+    // Cloud mode: subscribe to Supabase Broadcast for the live ping stream.
+    // The campus server sends results every ~2s via the same channel; the Vercel
+    // dashboard receives them here instead of through Socket.IO.
+    if (window.SMARTCAMPUS_CLOUD
+        && window.SUPABASE_URL
+        && window.SUPABASE_PUBLISHABLE_KEY
+        && typeof supabase !== 'undefined') {
+        try {
+            const client = supabase.createClient(window.SUPABASE_URL, window.SUPABASE_PUBLISHABLE_KEY);
+            client.channel('campus-ping-stream')
+                .on('broadcast', { event: 'ping_stream' }, ({ payload }) => {
+                    if (payload && Array.isArray(payload.devices)) {
+                        applyPingStreamResults(payload.devices);
+                    }
+                })
+                .subscribe();
+            window.__scRealtimeConnected = true;
+        } catch (err) {
+            console.warn('Supabase Broadcast subscription failed:', err.message || err);
+        }
     }
 }
 

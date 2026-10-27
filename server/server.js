@@ -68,6 +68,14 @@ const DISCOVERY_MAX_HOSTS = Number(process.env.DISCOVERY_MAX_HOSTS || 512);
 const DISCOVERY_CONCURRENCY = Number(process.env.DISCOVERY_CONCURRENCY || 30);
 const DISCOVERY_PING_TIMEOUT_SEC = Number(process.env.DISCOVERY_PING_TIMEOUT_SEC || 2);
 
+// Campus server bridge — when set, Vercel proxies scan requests here instead of returning 409
+const CAMPUS_SERVER_URL = (process.env.CAMPUS_SERVER_URL || '').replace(/\/$/, '');
+const CAMPUS_API_KEY = process.env.CAMPUS_API_KEY || '';
+
+// Supabase Broadcast channel for the real-time ping stream — lets the Vercel dashboard
+// receive live pings without Socket.IO (which can't hold a persistent connection serverless).
+let _supabaseBroadcastChannel = null;
+
 // Email alert configuration
 const SMTP_HOST        = process.env.SMTP_HOST        || '';
 const SMTP_PORT        = parseInt(process.env.SMTP_PORT || '587', 10);
@@ -128,6 +136,28 @@ if (CLOUD_MODE) {
     const needsCampusNetwork = /^\/api\/(monitor\/|ping(?:\/|$)|devices\/[^/]+\/ping(?:\/|$))/.test(req.path)
       || (req.method !== 'GET' && ['/api/settings/scanning', '/api/settings/email-alerts'].includes(req.path));
     if (!needsCampusNetwork) return next();
+
+    if (CAMPUS_SERVER_URL && CAMPUS_API_KEY) {
+      // Proxy the request to the campus server using a shared API key (server-to-server).
+      // The browser session cookie never leaves Vercel — auth is validated here first.
+      return requireAuth(req, res, async () => {
+        try {
+          const qs = req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : '';
+          const target = `${CAMPUS_SERVER_URL}${req.path}${qs}`;
+          const hasBody = req.method !== 'GET' && req.method !== 'HEAD' && req.body && Object.keys(req.body).length > 0;
+          const upstream = await fetch(target, {
+            method: req.method,
+            headers: { 'Content-Type': 'application/json', 'X-Campus-Api-Key': CAMPUS_API_KEY },
+            ...(hasBody ? { body: JSON.stringify(req.body) } : {}),
+          });
+          const data = await upstream.json().catch(() => ({}));
+          return res.status(upstream.status).json(data);
+        } catch {
+          return res.status(502).json({ error: 'Campus server unreachable. Ensure the campus scanner is running.' });
+        }
+      });
+    }
+
     return requireAuth(req, res, () => res.status(409).json({ error: 'Run network scans and manage scanner settings on the campus computer. This dashboard displays data saved to Supabase.' }));
   });
 }
@@ -201,6 +231,25 @@ function requireRole(...roles) {
       return res.status(403).json({ error: 'Insufficient permissions.' });
     }
     return next();
+  };
+}
+
+// Accept a valid campus API key header in place of a session — used so Vercel can proxy scan
+// requests to the campus server without sharing browser session cookies across origins.
+function requireApiKeyOrAuth(req, res, next) {
+  const key = req.headers['x-campus-api-key'];
+  if (key && CAMPUS_API_KEY && key === CAMPUS_API_KEY) {
+    req._apiKeyAuthed = true;
+    return next();
+  }
+  return requireAuth(req, res, next);
+}
+
+// Role-aware counterpart: skips role check when the request was authenticated via API key.
+function requireApiKeyOrRole(...roles) {
+  return (req, res, next) => {
+    if (req._apiKeyAuthed) return next();
+    return requireRole(...roles)(req, res, next);
   };
 }
 
@@ -1773,6 +1822,13 @@ async function runContinuousPingSweep() {
 
     const validResults = results.filter(r => r !== null);
     io.emit('devices:ping_stream', validResults);
+    if (_supabaseBroadcastChannel) {
+      _supabaseBroadcastChannel.send({
+        type: 'broadcast',
+        event: 'ping_stream',
+        payload: { devices: validResults },
+      }).catch(() => {});
+    }
   } catch (error) {
     console.error('Continuous ping sweep error:', error);
   } finally {
@@ -2109,7 +2165,7 @@ app.get('/api/settings/email-alerts', requireAuth, requireRole('Admin'), (req, r
 });
 
 // Email alert toggle — update state at runtime without restart (Admin only)
-app.post('/api/settings/email-alerts', requireAuth, requireRole('Admin'), (req, res) => {
+app.post('/api/settings/email-alerts', requireApiKeyOrAuth, requireApiKeyOrRole('Admin'), (req, res) => {
   if (typeof req.body.enabled !== 'boolean') {
     return res.status(400).json({ error: 'enabled must be a boolean.' });
   }
@@ -2244,7 +2300,7 @@ app.put('/api/devices/:deviceId/location', requireAuth, async (req, res) => {
 });
 
 // Live ICMP ping for a specific device (latency and packet loss)
-app.get('/api/devices/:deviceId/ping', requireAuth, async (req, res) => {
+app.get('/api/devices/:deviceId/ping', requireApiKeyOrAuth, async (req, res) => {
   const deviceId = Number(req.params.deviceId);
   if (!Number.isInteger(deviceId) || deviceId <= 0) {
     return res.status(400).json({ error: 'Invalid device ID.' });
@@ -2285,7 +2341,7 @@ app.get('/api/devices/:deviceId/ping', requireAuth, async (req, res) => {
 });
 
 // Live ICMP ping by IP address (for devices without a DB ID)
-app.get('/api/ping', requireAuth, async (req, res) => {
+app.get('/api/ping', requireApiKeyOrAuth, async (req, res) => {
   const targetIp = typeof req.query.target === 'string' ? req.query.target.trim() : '';
   if (!isValidIp(targetIp)) {
     return res.status(400).json({ error: 'Invalid target IP address.' });
@@ -2388,7 +2444,7 @@ app.get('/api/settings/scanning', requireAuth, (req, res) => {
 });
 
 // Update scanning status (Admin only)
-app.put('/api/settings/scanning', requireAuth, requireRole('Admin'), (req, res) => {
+app.put('/api/settings/scanning', requireApiKeyOrAuth, requireApiKeyOrRole('Admin'), (req, res) => {
   const parsed = parseRequiredBoolean(req.body?.enabled);
   if (parsed === null) {
     return res.status(400).json({ error: 'Enabled must be a boolean.' });
@@ -2400,7 +2456,7 @@ app.put('/api/settings/scanning', requireAuth, requireRole('Admin'), (req, res) 
 });
 
 // Trigger an on-demand discovery scan (Admin only)
-app.post('/api/monitor/discover', requireAuth, requireRole('Admin'), async (req, res) => {
+app.post('/api/monitor/discover', requireApiKeyOrAuth, requireApiKeyOrRole('Admin'), async (req, res) => {
   if (!scanningEnabled) {
     return res.status(409).json({ error: 'Scanning is disabled in settings.' });
   }
@@ -2458,7 +2514,7 @@ app.get('/api/scan-sessions', requireAuth, async (req, res) => {
 });
 
 // Trigger an on-demand router scan
-app.get('/api/monitor/router', requireAuth, async (req, res) => {
+app.get('/api/monitor/router', requireApiKeyOrAuth, async (req, res) => {
   if (!scanningEnabled) {
     return res.status(409).json({ error: 'Scanning is disabled in settings.' });
   }
@@ -2491,7 +2547,7 @@ app.get('/api/monitor/router', requireAuth, async (req, res) => {
 });
 
 // Diagnostic endpoint — returns the currently detected gateway and matching local interface
-app.get('/api/monitor/gateway-info', requireAuth, async (req, res) => {
+app.get('/api/monitor/gateway-info', requireApiKeyOrAuth, async (req, res) => {
   try {
     const gatewayIp = await detectDefaultGateway();
     const local = gatewayIp ? getLocalNetworkInfo(gatewayIp) : getLocalNetworkInfo();
@@ -3223,6 +3279,28 @@ app.get('/api/activity-logs', requireAuth, requireRole('Admin'), async (req, res
   }
 });
 
+// Open a Supabase Realtime Broadcast channel so the campus server can push live ping results
+// directly to browsers on the Vercel dashboard without going through Socket.IO.
+async function initBroadcastChannel() {
+  if (CLOUD_MODE || !process.env.SUPABASE_URL || !process.env.SUPABASE_SECRET_KEY) return;
+  try {
+    const { createClient } = require('@supabase/supabase-js');
+    const client = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SECRET_KEY);
+    const ch = client.channel('campus-ping-stream');
+    await new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error('subscribe timeout')), 10000);
+      ch.subscribe((status) => {
+        if (status === 'SUBSCRIBED') { clearTimeout(timer); resolve(); }
+        else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') { clearTimeout(timer); reject(new Error(status)); }
+      });
+    });
+    _supabaseBroadcastChannel = ch;
+    console.log('Supabase Broadcast channel ready (campus-ping-stream).');
+  } catch (err) {
+    console.warn('Supabase Broadcast channel unavailable:', err.message);
+  }
+}
+
 // Refuse to serve traffic until the explicit database migration has completed.
 async function startServer() {
   try {
@@ -3231,6 +3309,7 @@ async function startServer() {
     httpServer.listen(PORT, () => {
       console.log(`SmartCampus API running on http://localhost:${PORT} (Supabase PostgreSQL)`);
       startScheduledScans();
+      initBroadcastChannel();
     });
   } catch (error) {
     console.error('Database startup failed:', error.code || error.message);
