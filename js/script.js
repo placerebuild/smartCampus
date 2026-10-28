@@ -2577,17 +2577,17 @@ function createStatusChart(onlineCount, offlineCount, unknownCount) {
                 title: {
                     display: true,
                     text: `${total} Total Device${total !== 1 ? 's' : ''}`,
-                    font: { family: "'Sora', sans-serif", size: 15, weight: 700 },
+                    font: { family: "'Sora', sans-serif", size: 12, weight: 700 },
                     color: '#122f4b',
-                    padding: { bottom: 14 }
+                    padding: { bottom: 6 }
                 },
                 legend: {
                     position: 'bottom',
                     labels: {
                         usePointStyle: true,
                         pointStyle: 'circle',
-                        padding: 18,
-                        font: { family: "'IBM Plex Sans', sans-serif", size: 13, weight: 600 },
+                        padding: 10,
+                        font: { family: "'IBM Plex Sans', sans-serif", size: 11, weight: 600 },
                         color: '#435972'
                     }
                 },
