@@ -2456,6 +2456,20 @@ app.get('/api/settings/scanning', requireAuth, (req, res) => {
   return res.json({ enabled: scanningEnabled, available: !CLOUD_MODE });
 });
 
+// Test endpoint: fire a broadcast alert to verify Supabase Broadcast plumbing (Admin only)
+app.post('/api/test/alert-broadcast', requireAuth, requireRole('Admin'), (req, res) => {
+  const testAlert = {
+    type: 'downtime',
+    severity: req.body.severity || 'warning',
+    stage: 'warn',
+    message: req.body.message || 'Test alert — Supabase Broadcast is working.',
+    deviceName: 'Test Device',
+    time: new Date().toISOString(),
+  };
+  emitAlertEvent(testAlert);
+  res.json({ ok: true, broadcastSent: !!_supabaseBroadcastChannel, alert: testAlert });
+});
+
 // Update scanning status (Admin only)
 app.put('/api/settings/scanning', requireApiKeyOrAuth, requireApiKeyOrRole('Admin'), (req, res) => {
   const parsed = parseRequiredBoolean(req.body?.enabled);
