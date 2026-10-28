@@ -773,6 +773,7 @@ function setDevicesData(devices) {
     devicesData = Array.isArray(devices) ? devices : [];
     populateDevicesTable();
     updateStatCards();
+    populateArpPanel();
 }
 
 function updateAlertBadge() {
@@ -2815,28 +2816,57 @@ async function initScanSettings() {
 }
 
 // Shared handler for both Socket.IO (local) and Supabase Broadcast (cloud) ping streams.
+function populateArpPanel() {
+    const tbody = document.getElementById('arp-tbody');
+    const countEl = document.getElementById('arp-count');
+    if (!tbody) return;
+
+    const arpEntries = (typeof devicesData !== 'undefined' ? devicesData : [])
+        .filter(d => d.mac && d.mac.trim() && d.mac !== 'N/A');
+
+    if (countEl) countEl.textContent = `${arpEntries.length} entries`;
+
+    if (!arpEntries.length) {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-3">No ARP entries discovered yet.</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = arpEntries.map(d => {
+        const typeIcon = d.type === 'router' ? 'fa-router' : d.type === 'switch' ? 'fa-sitemap'
+            : d.type === 'ap' ? 'fa-wifi' : d.type === 'pc' ? 'fa-desktop'
+            : d.type === 'phone' ? 'fa-mobile-alt' : 'fa-microchip';
+        return `<tr>
+            <td class="font-monospace" style="font-size:0.78rem;">${d.ip || '—'}</td>
+            <td class="font-monospace text-success" style="font-size:0.78rem;">${d.mac}</td>
+            <td style="font-size:0.78rem;"><i class="fas ${typeIcon} me-1 text-muted"></i>${d.type || '—'}</td>
+            <td style="font-size:0.78rem;">${d.name || '—'}</td>
+            <td class="text-muted" style="font-size:0.78rem;">${d.lastSeen || '—'}</td>
+        </tr>`;
+    }).join('');
+}
+
 function applyPingStreamResults(results) {
-    const pingStreamFeed = document.getElementById('ping-stream-feed');
-    if (pingStreamFeed) {
-        let html = '';
-        results.forEach(res => {
+    // Update ICMP table
+    const icmpTbody = document.getElementById('icmp-tbody');
+    const icmpCount = document.getElementById('icmp-count');
+    if (icmpTbody && results.length) {
+        if (icmpCount) icmpCount.textContent = `${results.length} probed`;
+        icmpTbody.innerHTML = results.map(res => {
             const displayStatus = res.status || (res.alive ? 'Online' : 'Offline');
-            const statusColor = displayStatus === 'Online' ? 'success' : 'danger';
-            const latencyText = res.latencyMs !== null ? `${res.latencyMs.toFixed(1)} ms` : 'N/A';
-            html += `
-                        <div class="list-group-item d-flex justify-content-between align-items-center py-2">
-                            <div>
-                                <small class="fw-bold">${res.name || res.ip}</small><br>
-                                <small class="text-muted" style="font-size:0.75rem;">${new Date(res.time).toLocaleTimeString()}</small>
-                            </div>
-                            <div class="text-end">
-                                <span class="badge bg-${statusColor} mb-1">${displayStatus}</span><br>
-                                <small class="text-muted" style="font-size:0.75rem;">${latencyText}</small>
-                            </div>
-                        </div>
-                    `;
-        });
-        pingStreamFeed.innerHTML = html;
+            const statusColor = displayStatus === 'Online' ? 'success' : displayStatus === 'Offline' ? 'danger' : 'warning';
+            const latencyText = res.latencyMs != null ? `${Number(res.latencyMs).toFixed(1)} ms` : 'N/A';
+            const latencyColor = res.latencyMs == null ? 'text-muted'
+                : res.latencyMs >= 200 ? 'text-danger fw-semibold'
+                : res.latencyMs >= 80 ? 'text-warning fw-semibold'
+                : 'text-success';
+            return `<tr>
+                <td style="font-size:0.78rem;" class="fw-semibold">${res.name || '—'}</td>
+                <td class="font-monospace" style="font-size:0.78rem;">${res.ip || '—'}</td>
+                <td style="font-size:0.78rem;"><span class="badge bg-${statusColor}">${displayStatus}</span></td>
+                <td class="${latencyColor}" style="font-size:0.78rem;">${latencyText}</td>
+                <td class="text-muted" style="font-size:0.78rem;">${res.time ? new Date(res.time).toLocaleTimeString() : '—'}</td>
+            </tr>`;
+        }).join('');
     }
 
     // Real-time table updates
@@ -3021,6 +3051,7 @@ window.addEventListener('load', async function () {
     populateRecentAlerts();
     populateAlertsTable();
     populateReportsTable();
+    populateArpPanel();
     initTopology();
     initDashboardRealtime();
 

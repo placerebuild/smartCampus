@@ -101,28 +101,69 @@
                 </div>
             </div>
 
-            <div class="col-12 col-lg-8">
-                <div class="card p-4 panel-card">
-                    <h6 class="section-title">Device Chart</h6><canvas id="statusChart" height="300"></canvas>
+            <div class="col-12 col-lg-5">
+                <div class="card p-3 panel-card">
+                    <h6 class="section-title mb-2">Device Status</h6>
+                    <canvas id="statusChart" height="180"></canvas>
                 </div>
             </div>
-            <div class="col-12 col-lg-4">
-                <div class="card p-4 panel-card">
+            <div class="col-12 col-lg-7">
+                <div class="card p-3 panel-card">
                     <h6 class="section-title">Recent Alerts</h6>
                     <ul class="list-group list-group-flush" id="recent-alerts"></ul>
                 </div>
             </div>
         </div>
 
+        <!-- ICMP + ARP panels -->
         <div class="row g-4 mt-1">
-            <div class="col-12">
-                <div class="card p-4 panel-card" style="max-height: 300px; overflow-y: auto;">
-                    <h6 class="section-title"><i class="fas fa-satellite-dish me-2 text-info"></i>Real-Time Pings</h6>
-                    <div class="list-group list-group-flush" id="ping-stream-feed">
-                        <div class="text-center text-muted mt-4">
-                            <i class="fas fa-spinner fa-spin mb-2"></i><br>
-                            Waiting for ping stream...
-                        </div>
+            <div class="col-12 col-lg-6">
+                <div class="card p-3 panel-card">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h6 class="section-title mb-0"><i class="fas fa-satellite-dish me-2 text-info"></i>ICMP Ping Results</h6>
+                        <span class="badge bg-info-subtle text-info border border-info-subtle" id="icmp-count">0 probed</span>
+                    </div>
+                    <p class="text-muted small mb-2" style="font-size:0.75rem;">Live ICMP echo results — reachability and round-trip latency per device.</p>
+                    <div style="max-height:280px;overflow-y:auto;">
+                        <table class="table table-sm table-hover mb-0" id="icmp-table">
+                            <thead class="table-light sticky-top" style="font-size:0.72rem;">
+                                <tr>
+                                    <th>Device</th>
+                                    <th>IP Address</th>
+                                    <th>Status</th>
+                                    <th>Latency</th>
+                                    <th>Last Ping</th>
+                                </tr>
+                            </thead>
+                            <tbody id="icmp-tbody">
+                                <tr><td colspan="5" class="text-center text-muted py-3"><i class="fas fa-spinner fa-spin me-1"></i>Waiting for ping stream…</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <div class="col-12 col-lg-6">
+                <div class="card p-3 panel-card">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h6 class="section-title mb-0"><i class="fas fa-ethernet me-2 text-success"></i>ARP Table</h6>
+                        <span class="badge bg-success-subtle text-success border border-success-subtle" id="arp-count">0 entries</span>
+                    </div>
+                    <p class="text-muted small mb-2" style="font-size:0.75rem;">ARP-resolved entries — IP-to-MAC mappings discovered on the campus subnet.</p>
+                    <div style="max-height:280px;overflow-y:auto;">
+                        <table class="table table-sm table-hover mb-0" id="arp-table">
+                            <thead class="table-light sticky-top" style="font-size:0.72rem;">
+                                <tr>
+                                    <th>IP Address</th>
+                                    <th>MAC Address</th>
+                                    <th>Device Type</th>
+                                    <th>Name</th>
+                                    <th>Last Seen</th>
+                                </tr>
+                            </thead>
+                            <tbody id="arp-tbody">
+                                <tr><td colspan="5" class="text-center text-muted py-3"><i class="fas fa-spinner fa-spin me-1"></i>Loading ARP entries…</td></tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>

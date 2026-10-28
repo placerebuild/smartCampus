@@ -589,3 +589,27 @@ code {
 }
 
 
+
+/* ICMP & ARP panels */
+#icmp-table thead th,
+#arp-table thead th {
+    background: #f4f8fc;
+    color: var(--text-500);
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    border-bottom: 1px solid var(--border-soft);
+    position: sticky;
+    top: 0;
+    z-index: 1;
+}
+
+#icmp-table tbody tr:hover,
+#arp-table tbody tr:hover {
+    background: rgba(31, 122, 224, 0.04);
+}
+
+#icmp-table .font-monospace,
+#arp-table .font-monospace {
+    font-size: 0.77rem;
+    letter-spacing: 0.02em;
+}
