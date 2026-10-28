@@ -623,8 +623,9 @@ code {
     .main-content > .row > * { padding-top: 0; }
     .main-content > .hero-panel { margin-bottom: 0 !important; }
 
-    /* Main panels row: the 1fr grid track gives it a real height;
-       cols must be flex columns so cards can stretch inside them */
+    /* Main panels row: 1fr grid track gives it an explicit height.
+       Cols become flex columns; cards use flex:1 (not h-100/height:100%
+       which can fail to resolve against flex-determined parent heights). */
     .dash-main-row {
         min-height: 0;
         align-items: stretch;
@@ -632,6 +633,10 @@ code {
     .dash-main-row > [class*="col-"] {
         display: flex;
         flex-direction: column;
+        min-height: 0;
+    }
+    .dash-main-row > [class*="col-"] > .card {
+        flex: 1;
         min-height: 0;
     }
 

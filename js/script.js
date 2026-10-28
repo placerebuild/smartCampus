@@ -2538,8 +2538,6 @@ let dashboardChartInstance = null;
 function createStatusChart(onlineCount, offlineCount, unknownCount) {
     const canvas = document.getElementById('statusChart');
     if (!canvas) return;
-    canvas.style.width  = '100%';
-    canvas.style.height = '100%';
 
     const total = onlineCount + offlineCount + unknownCount;
 
@@ -2617,12 +2615,14 @@ function createStatusChart(onlineCount, offlineCount, unknownCount) {
             }
         }
     });
-    // Canvas height is 0 until CSS Grid finishes layout — retry at increasing delays
-    const _cr = () => { if (dashboardChartInstance) dashboardChartInstance.resize(); };
-    [200, 500, 1000].forEach(ms => setTimeout(_cr, ms));
+    // ResizeObserver fires the moment the wrapper gets a real height from CSS Grid
     if (!window._chartResizeWired) {
         window._chartResizeWired = true;
+        const _cr = () => { if (dashboardChartInstance) dashboardChartInstance.resize(); };
         window.addEventListener('resize', _cr);
+        if (typeof ResizeObserver !== 'undefined' && canvas.parentElement) {
+            new ResizeObserver(_cr).observe(canvas.parentElement);
+        }
     }
 }
 
