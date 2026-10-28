@@ -2573,21 +2573,26 @@ function createStatusChart(onlineCount, offlineCount, unknownCount) {
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            cutout: '62%',
+            cutout: '66%',
+            layout: {
+                padding: { top: 6, bottom: 4, left: 10, right: 10 }
+            },
             plugins: {
                 title: {
                     display: true,
                     text: `${total} Total Device${total !== 1 ? 's' : ''}`,
-                    font: { family: "'Sora', sans-serif", size: 12, weight: 700 },
+                    font: { family: "'Sora', sans-serif", size: 13, weight: 700 },
                     color: '#122f4b',
-                    padding: { bottom: 6 }
+                    padding: { top: 2, bottom: 8 }
                 },
                 legend: {
                     position: 'bottom',
                     labels: {
                         usePointStyle: true,
                         pointStyle: 'circle',
-                        padding: 10,
+                        boxWidth: 8,
+                        boxHeight: 8,
+                        padding: 14,
                         font: { family: "'IBM Plex Sans', sans-serif", size: 11, weight: 600 },
                         color: '#435972'
                     }
