@@ -2846,28 +2846,50 @@ function populateArpPanel() {
     }).join('');
 }
 
+let _icmpShowAll = false;
+let _icmpLastResults = [];
+
+function renderIcmpTable() {
+    const icmpTbody = document.getElementById('icmp-tbody');
+    const icmpCount = document.getElementById('icmp-count');
+    const icmpToggle = document.getElementById('icmp-toggle');
+    if (!icmpTbody) return;
+    const results = _icmpLastResults;
+    const LIMIT = 10;
+    const visible = _icmpShowAll ? results : results.slice(0, LIMIT);
+    if (icmpCount) icmpCount.textContent = `${results.length} probed`;
+    if (icmpToggle) {
+        if (results.length > LIMIT) {
+            icmpToggle.style.display = '';
+            icmpToggle.textContent = _icmpShowAll ? 'Show less' : `See all ${results.length}`;
+        } else {
+            icmpToggle.style.display = 'none';
+        }
+    }
+    icmpTbody.innerHTML = visible.map(res => {
+        const displayStatus = res.status || (res.alive ? 'Online' : 'Offline');
+        const statusColor = displayStatus === 'Online' ? 'success' : displayStatus === 'Offline' ? 'danger' : 'warning';
+        const latencyText = res.latencyMs != null ? `${Number(res.latencyMs).toFixed(1)} ms` : 'N/A';
+        const latencyColor = res.latencyMs == null ? 'text-muted'
+            : res.latencyMs >= 200 ? 'text-danger fw-semibold'
+            : res.latencyMs >= 80 ? 'text-warning fw-semibold'
+            : 'text-success';
+        return `<tr>
+            <td style="font-size:0.78rem;" class="fw-semibold">${res.name || '—'}</td>
+            <td class="font-monospace" style="font-size:0.78rem;">${res.ip || '—'}</td>
+            <td style="font-size:0.78rem;"><span class="badge bg-${statusColor}">${displayStatus}</span></td>
+            <td class="${latencyColor}" style="font-size:0.78rem;">${latencyText}</td>
+            <td class="text-muted" style="font-size:0.78rem;">${res.time ? new Date(res.time).toLocaleTimeString() : '—'}</td>
+        </tr>`;
+    }).join('');
+}
+
 function applyPingStreamResults(results) {
     // Update ICMP table
     const icmpTbody = document.getElementById('icmp-tbody');
-    const icmpCount = document.getElementById('icmp-count');
     if (icmpTbody && results.length) {
-        if (icmpCount) icmpCount.textContent = `${results.length} probed`;
-        icmpTbody.innerHTML = results.map(res => {
-            const displayStatus = res.status || (res.alive ? 'Online' : 'Offline');
-            const statusColor = displayStatus === 'Online' ? 'success' : displayStatus === 'Offline' ? 'danger' : 'warning';
-            const latencyText = res.latencyMs != null ? `${Number(res.latencyMs).toFixed(1)} ms` : 'N/A';
-            const latencyColor = res.latencyMs == null ? 'text-muted'
-                : res.latencyMs >= 200 ? 'text-danger fw-semibold'
-                : res.latencyMs >= 80 ? 'text-warning fw-semibold'
-                : 'text-success';
-            return `<tr>
-                <td style="font-size:0.78rem;" class="fw-semibold">${res.name || '—'}</td>
-                <td class="font-monospace" style="font-size:0.78rem;">${res.ip || '—'}</td>
-                <td style="font-size:0.78rem;"><span class="badge bg-${statusColor}">${displayStatus}</span></td>
-                <td class="${latencyColor}" style="font-size:0.78rem;">${latencyText}</td>
-                <td class="text-muted" style="font-size:0.78rem;">${res.time ? new Date(res.time).toLocaleTimeString() : '—'}</td>
-            </tr>`;
-        }).join('');
+        _icmpLastResults = results;
+        renderIcmpTable();
     }
 
     // Real-time table updates

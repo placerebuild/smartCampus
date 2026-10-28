@@ -119,7 +119,10 @@
                 <div class="card p-2 panel-card h-100">
                     <div class="d-flex justify-content-between align-items-center mb-1">
                         <div class="section-title mb-0" style="font-size:0.78rem;"><i class="fas fa-satellite-dish me-1 text-info"></i>ICMP Result</div>
-                        <span class="badge bg-info-subtle text-info border border-info-subtle" style="font-size:0.65rem;" id="icmp-count">0</span>
+                        <div class="d-flex align-items-center gap-2">
+                            <button id="icmp-toggle" class="btn btn-link btn-sm p-0 text-info" style="font-size:0.68rem;display:none;" onclick="window._icmpShowAll=!window._icmpShowAll;renderIcmpTable();">See all</button>
+                            <span class="badge bg-info-subtle text-info border border-info-subtle" style="font-size:0.65rem;" id="icmp-count">0</span>
+                        </div>
                     </div>
                     <p class="text-muted mb-1" style="font-size:0.68rem;">Live ICMP echo — reachability and round-trip latency per device.</p>
                     <div style="overflow-y:auto;flex:1;">
