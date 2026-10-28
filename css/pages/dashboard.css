@@ -604,7 +604,23 @@ code {
         overflow: hidden;
         display: flex;
         flex-direction: column;
+        gap: 0.5rem;          /* vertical rhythm between sections */
         padding-bottom: 0.5rem;
+    }
+
+    /* Bootstrap .row uses margin-top: -gutter to collapse between stacked rows.
+       Inside our flex column those negative margins cause visual overlap — cancel them. */
+    .main-content > .row {
+        margin-top: 0 !important;
+        margin-bottom: 0 !important; /* gap handles all vertical spacing */
+    }
+    /* The cols' compensating padding-top also becomes unnecessary */
+    .main-content > .row > * {
+        padding-top: 0;
+    }
+    /* Hero banner uses mb-2; suppress it — gap handles it */
+    .main-content > .hero-panel {
+        margin-bottom: 0 !important;
     }
 
     .hero-panel   { flex-shrink: 0; }

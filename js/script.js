@@ -2614,6 +2614,10 @@ function createStatusChart(onlineCount, offlineCount, unknownCount) {
             }
         }
     });
+    // Flex layouts settle after paint; resize ensures canvas fills its container
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+        if (dashboardChartInstance) dashboardChartInstance.resize();
+    }));
 }
 
 function populateDashboardAlerts(devices) {
