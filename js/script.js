@@ -105,6 +105,7 @@ function applyDeviceResults(devices) {
     if (dvOnline)  dvOnline.textContent  = devicesData.filter(d => d.status === 'Online').length;
     if (dvOffline) dvOffline.textContent = devicesData.filter(d => d.status === 'Offline').length;
     populateDevicesTable();
+    populateArpPanel();
     setTopologyDevices(devices);
     updateTopologyData({ fit: false });
     populateReportsTable();
