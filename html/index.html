@@ -103,49 +103,22 @@
             </div>
         </div>
 
-        <!-- Main 4-column panel row — all visible without scrolling -->
-        <div class="row g-2">
-            <div class="col-12 col-lg-3">
-                <div class="card p-2 panel-card h-100">
+        <!-- Main panel row: Left (chart + ARP) | Center (ICMP) | Right (Alerts) -->
+        <div class="row g-2 align-items-stretch">
+
+            <!-- LEFT: Device Status on top, ARP Table below -->
+            <div class="col-12 col-lg-3 d-flex flex-column gap-2">
+                <div class="card p-2 panel-card">
                     <div class="section-title mb-1" style="font-size:0.78rem;">Device Status</div>
-                    <canvas id="statusChart" height="160"></canvas>
+                    <canvas id="statusChart" height="155"></canvas>
                 </div>
-            </div>
-            <div class="col-12 col-lg-3">
-                <div class="card p-2 panel-card h-100">
-                    <div class="section-title mb-1" style="font-size:0.78rem;">Recent Alerts</div>
-                    <div style="overflow-y:auto;max-height:280px;">
-                        <ul class="list-group list-group-flush" id="recent-alerts"></ul>
-                    </div>
-                </div>
-            </div>
-            <div class="col-12 col-lg-3">
-                <div class="card p-2 panel-card h-100">
-                    <div class="d-flex justify-content-between align-items-center mb-1">
-                        <div class="section-title mb-0" style="font-size:0.78rem;"><i class="fas fa-satellite-dish me-1 text-info"></i>ICMP Results</div>
-                        <span class="badge bg-info-subtle text-info border border-info-subtle" style="font-size:0.65rem;" id="icmp-count">0</span>
-                    </div>
-                    <p class="text-muted mb-1" style="font-size:0.68rem;">Live echo: reachability + round-trip latency.</p>
-                    <div style="overflow-y:auto;max-height:260px;">
-                        <table class="table table-sm table-hover mb-0" id="icmp-table">
-                            <thead class="table-light" style="font-size:0.67rem;">
-                                <tr><th>Device</th><th>IP</th><th>Status</th><th>Latency</th><th>Time</th></tr>
-                            </thead>
-                            <tbody id="icmp-tbody">
-                                <tr><td colspan="5" class="text-center text-muted py-2" style="font-size:0.72rem;"><i class="fas fa-spinner fa-spin me-1"></i>Waiting…</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-            <div class="col-12 col-lg-3">
-                <div class="card p-2 panel-card h-100">
+                <div class="card p-2 panel-card flex-fill">
                     <div class="d-flex justify-content-between align-items-center mb-1">
                         <div class="section-title mb-0" style="font-size:0.78rem;"><i class="fas fa-ethernet me-1 text-success"></i>ARP Table</div>
                         <span class="badge bg-success-subtle text-success border border-success-subtle" style="font-size:0.65rem;" id="arp-count">0</span>
                     </div>
                     <p class="text-muted mb-1" style="font-size:0.68rem;">IP → MAC mappings discovered on campus subnet.</p>
-                    <div style="overflow-y:auto;max-height:260px;">
+                    <div style="overflow-y:auto;max-height:140px;">
                         <table class="table table-sm table-hover mb-0" id="arp-table">
                             <thead class="table-light" style="font-size:0.67rem;">
                                 <tr><th>IP</th><th>MAC</th><th>Type</th><th>Name</th><th>Last Seen</th></tr>
@@ -157,6 +130,38 @@
                     </div>
                 </div>
             </div>
+
+            <!-- CENTER: ICMP Results -->
+            <div class="col-12 col-lg-5">
+                <div class="card p-2 panel-card h-100">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <div class="section-title mb-0" style="font-size:0.78rem;"><i class="fas fa-satellite-dish me-1 text-info"></i>ICMP Results</div>
+                        <span class="badge bg-info-subtle text-info border border-info-subtle" style="font-size:0.65rem;" id="icmp-count">0</span>
+                    </div>
+                    <p class="text-muted mb-1" style="font-size:0.68rem;">Live ICMP echo — reachability and round-trip latency per device.</p>
+                    <div style="overflow-y:auto;flex:1;">
+                        <table class="table table-sm table-hover mb-0" id="icmp-table">
+                            <thead class="table-light" style="font-size:0.67rem;position:sticky;top:0;z-index:1;">
+                                <tr><th>Device</th><th>IP Address</th><th>Status</th><th>Latency</th><th>Last Ping</th></tr>
+                            </thead>
+                            <tbody id="icmp-tbody">
+                                <tr><td colspan="5" class="text-center text-muted py-3" style="font-size:0.72rem;"><i class="fas fa-spinner fa-spin me-1"></i>Waiting for ping stream…</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- RIGHT: Recent Alerts -->
+            <div class="col-12 col-lg-4">
+                <div class="card p-2 panel-card h-100">
+                    <div class="section-title mb-1" style="font-size:0.78rem;">Recent Alerts</div>
+                    <div style="overflow-y:auto;max-height:440px;">
+                        <ul class="list-group list-group-flush" id="recent-alerts"></ul>
+                    </div>
+                </div>
+            </div>
+
         </div>
     </div>
 
