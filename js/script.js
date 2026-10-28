@@ -2887,8 +2887,9 @@ function renderIcmpTable() {
             : res.latencyMs >= 200 ? 'text-danger fw-semibold'
             : res.latencyMs >= 80 ? 'text-warning fw-semibold'
             : 'text-success';
-        return `<tr>
-            <td style="font-size:0.78rem;" class="fw-semibold">${res.name || '—'}</td>
+        const devPage = `devices.html?highlight=${encodeURIComponent(res.ip || '')}`;
+        return `<tr style="cursor:pointer;" onclick="location.href='${devPage}'">
+            <td style="font-size:0.78rem;" class="fw-semibold text-primary">${res.name || '—'}</td>
             <td class="font-monospace" style="font-size:0.78rem;">${res.ip || '—'}</td>
             <td style="font-size:0.78rem;"><span class="badge bg-${statusColor}">${displayStatus}</span></td>
             <td class="${latencyColor}" style="font-size:0.78rem;">${latencyText}</td>
@@ -3090,6 +3091,16 @@ window.addEventListener('load', async function () {
     populateArpPanel();
     initTopology();
     initDashboardRealtime();
+
+    // If arriving from ICMP table click, pre-fill search on devices page
+    const _hl = new URLSearchParams(location.search).get('highlight');
+    if (_hl && document.getElementById('devices-table')) {
+        const searchInput = document.querySelector('.search-input, #device-search');
+        if (searchInput) {
+            searchInput.value = _hl;
+            searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+    }
 
     // Wire up the email alert toggle in Settings
     const emailSwitch = document.getElementById('emailAlertSwitch');
