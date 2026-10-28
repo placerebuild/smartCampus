@@ -234,7 +234,6 @@ function openDeviceDetailsModal(device) {
                         <div class="device-detail-section">
                             <div class="d-flex justify-content-between align-items-center mb-2">
                                 <h6 class="section-title mb-0">Device Overview</h6>
-                                <button type="button" class="btn btn-sm btn-outline-primary" data-device-action="toggle-location-edit" ${canEditLocation ? '' : 'disabled'}>Edit Details</button>
                             </div>
                             <ul class="device-detail-list">
                                 <li><span class="device-detail-label">Name</span><strong data-device-field="name">${name}</strong></li>
@@ -1159,6 +1158,104 @@ const BUILDING_IMAGE_MAP = {
     'Unknown': '/images/unknown.png'
 };
 
+// Floor plan assignments loaded from /api/floor-plans: { [building]: { 1: url, 2: url, ... } }
+let _floorPlans          = {};
+let _currentBuildingName = null;
+let _currentFloorNum     = 1;
+
+async function loadFloorPlans() {
+    try {
+        const res = await fetch('/api/floor-plans', { credentials: 'include' });
+        if (res.ok) _floorPlans = await res.json();
+    } catch (_) {}
+}
+
+function hasBuildingFloorPlan(bName) {
+    const plans = _floorPlans[bName];
+    return Boolean(plans && Object.values(plans).some(Boolean));
+}
+
+// Returns "1st Floor", "2nd Floor", etc.
+function _floorOrdinal(n) {
+    const s = ['th','st','nd','rd'];
+    const v = n % 100;
+    return `${n}${s[(v - 20) % 10] || s[v] || s[0]} Floor`;
+}
+
+// Returns "1st floor" (lowercase) — matches keys in REALTIME_ROOMS
+function _floorKey(n) {
+    const s = ['th','st','nd','rd'];
+    const v = n % 100;
+    return `${n}${s[(v - 20) % 10] || s[v] || s[0]} floor`;
+}
+
+// Rebuild the floor-tabs-bar in the topology header
+function _rebuildFloorTabsBar(floorNums) {
+    const bar = document.getElementById('floor-tabs-bar');
+    if (!bar) return;
+    if (floorNums.length <= 1) { bar.innerHTML = ''; return; }
+    bar.innerHTML = floorNums.map(n => {
+        const active = n === _currentFloorNum;
+        return `<button data-floor="${n}" onclick="selectFloor(${n})" style="
+            padding:3px 10px; border-radius:5px; font-size:11px; font-weight:600; font-family:inherit;
+            cursor:pointer; white-space:nowrap; border:1px solid; transition:background 0.15s,color 0.15s;
+            ${active ? 'background:white;color:#1a3a6e;border-color:white;'
+                     : 'background:rgba(255,255,255,0.15);color:rgba(255,255,255,0.85);border-color:rgba(255,255,255,0.3);'}
+        ">${escapeHtml(_floorOrdinal(n))}</button>`;
+    }).join('');
+}
+
+// Rebuild the single floor panel inside #floor-panel-container
+function _renderFloorPanel(bName, floorNum) {
+    const container = document.getElementById('floor-panel-container');
+    if (!container) return;
+    const plans = _floorPlans[bName] || {};
+    const url   = plans[floorNum];
+    const ord   = _floorOrdinal(floorNum);
+    container.innerHTML = `
+        <div style="flex:1; display:flex; flex-direction:column; background:white; border-radius:8px; overflow:hidden; box-shadow:0 2px 8px rgba(0,0,0,0.12);">
+            <div id="floor-map-active" style="flex:1; position:relative; overflow:hidden;">
+                <img id="floor-img-active" src="${escapeHtml(url || '')}"
+                     alt="${escapeHtml(ord)}" draggable="false"
+                     style="width:100%; height:100%; object-fit:contain; display:block; pointer-events:none; user-select:none;${url ? '' : 'opacity:0;'}">
+                ${url ? '' : `<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#8ba5be;font-size:13px;pointer-events:none;font-family:'IBM Plex Sans',sans-serif;">No floor plan assigned</div>`}
+                <div id="floor-dot-overlay-active" style="position:absolute; inset:0; pointer-events:none; display:none;"></div>
+            </div>
+            <div id="floor-label-active" style="text-align:center; padding:8px 0; background:#1a3a6e; color:white; font-weight:700; font-size:13px; letter-spacing:0.5px;">${escapeHtml(ord.toUpperCase())}</div>
+        </div>`;
+    renderFloorMap();
+    if (floorDotsEnabled) {
+        const overlay = document.getElementById('floor-dot-overlay-active');
+        if (overlay) overlay.style.display = 'block';
+        requestAnimationFrame(() => requestAnimationFrame(renderFloorMapDots));
+    }
+}
+
+function applyBuildingFloorImgs(bName) {
+    const plans     = _floorPlans[bName] || {};
+    const floorNums = Object.keys(plans).map(Number).sort((a, b) => a - b);
+    _currentBuildingName = bName;
+    if (!floorNums.includes(_currentFloorNum)) {
+        _currentFloorNum = floorNums[0] || 1;
+    }
+    _rebuildFloorTabsBar(floorNums);
+    _renderFloorPanel(bName, _currentFloorNum);
+}
+
+window.selectFloor = function selectFloor(floorNum) {
+    _currentFloorNum = floorNum;
+    const bar = document.getElementById('floor-tabs-bar');
+    if (bar) {
+        bar.querySelectorAll('button[data-floor]').forEach(btn => {
+            const active = Number(btn.dataset.floor) === floorNum;
+            btn.style.background   = active ? 'white' : 'rgba(255,255,255,0.15)';
+            btn.style.color        = active ? '#1a3a6e' : 'rgba(255,255,255,0.85)';
+            btn.style.borderColor  = active ? 'white' : 'rgba(255,255,255,0.3)';
+        });
+    }
+    _renderFloorPanel(_currentBuildingName, floorNum);
+};
+
 function buildBuildingTopologyData() {
     const buildingMap = new Map();
     campusDevices.forEach(device => {
@@ -1241,7 +1338,7 @@ function buildBuildingTopologyData() {
 function drillIntoBuilding(buildingName) {
     const viewModeSelect = document.getElementById('topology-view-mode');
     const buildingFilter = document.getElementById('building-filter');
-    const hasFloorPlan = buildingName === 'IC Building';
+    const hasFloorPlan = hasBuildingFloorPlan(buildingName);
 
     if (hasFloorPlan) {
         if (viewModeSelect) viewModeSelect.value = 'floor';
@@ -1503,6 +1600,7 @@ async function fetchTopologySnapshot() {
 
 async function loadTopologySnapshot(options = {}) {
     try {
+        await loadFloorPlans();
         const payload = await fetchTopologySnapshot();
         if (!payload) {
             updateTopologyEmptyState(false);
@@ -1621,9 +1719,13 @@ function defaultFloorPosition(key, index, total) {
 }
 
 function getDeviceFloorNumber(device) {
-    const f = String(device.floor || '').toLowerCase();
-    if (/\b(1|first|ground|uno)\b/.test(f)) return 1;
-    if (/\b(2|second|dos)\b/.test(f)) return 2;
+    const f = String(device.floor || '').toLowerCase().trim();
+    if (!f) return null;
+    const m = f.match(/^(\d+)/);
+    if (m) return parseInt(m[1], 10);
+    if (/\b(first|ground)\b/.test(f)) return 1;
+    if (/\bsecond\b/.test(f)) return 2;
+    if (/\bthird\b/.test(f)) return 3;
     return null;
 }
 
@@ -1661,23 +1763,23 @@ function makeMarkerDraggable(marker, container, key) {
 }
 
 function renderFloorMap() {
-    const floor1El = document.getElementById('floor-map-1');
-    const floor2El = document.getElementById('floor-map-2');
-    if (!floor1El || !floor2El) return;
+    const floorEl = document.getElementById('floor-map-active');
+    if (!floorEl) return;
 
-    floor1El.querySelectorAll('.floor-device-marker').forEach(el => el.remove());
-    floor2El.querySelectorAll('.floor-device-marker').forEach(el => el.remove());
+    floorEl.querySelectorAll('.floor-device-marker').forEach(el => el.remove());
 
     const positions = getFloorPositions();
     const devices = (typeof devicesData !== 'undefined' && devicesData.length) ? devicesData :
                     (typeof topologyDevices !== 'undefined' ? topologyDevices : []);
 
-    devices.forEach((device, idx) => {
-        const df = getDeviceFloorNumber(device);
-        const targetEl = df === 2 ? floor2El : floor1El;
+    // Show devices assigned to _currentFloorNum; devices with no floor go on floor 1
+    const floorDevices = devices.filter(d => {
+        const df = getDeviceFloorNumber(d);
+        return df === _currentFloorNum || (df === null && _currentFloorNum === 1);
+    });
 
+    floorDevices.forEach((device, idx) => {
         const key = typeof getDeviceKey === 'function' ? getDeviceKey(device) : (device.ip || String(idx));
-        const floorDevices = devices.filter(d => (df === 2 ? getDeviceFloorNumber(d) === 2 : getDeviceFloorNumber(d) !== 2));
         const pos = positions[key] || defaultFloorPosition(key, idx, floorDevices.length);
 
         const marker = document.createElement('div');
@@ -1695,8 +1797,8 @@ function renderFloorMap() {
 
         marker.appendChild(dot);
         marker.appendChild(label);
-        targetEl.appendChild(marker);
-        makeMarkerDraggable(marker, targetEl, key);
+        floorEl.appendChild(marker);
+        makeMarkerDraggable(marker, floorEl, key);
     });
 }
 
@@ -1729,18 +1831,12 @@ window.toggleFloorDots = function toggleFloorDots() {
     // Re-apply layout (shows/hides detail col based on toggle)
     _setFloorMapShellVisible(true);
 
-    const overlayIds = ['floor-dot-overlay-1', 'floor-dot-overlay-2'];
+    const overlay = document.getElementById('floor-dot-overlay-active');
     if (floorDotsEnabled) {
-        overlayIds.forEach(id => {
-            const el = document.getElementById(id);
-            if (el) el.style.display = 'block';
-        });
+        if (overlay) overlay.style.display = 'block';
         requestAnimationFrame(() => requestAnimationFrame(renderFloorMapDots));
     } else {
-        overlayIds.forEach(id => {
-            const el = document.getElementById(id);
-            if (el) { el.innerHTML = ''; el.style.display = 'none'; }
-        });
+        if (overlay) { overlay.innerHTML = ''; overlay.style.display = 'none'; }
     }
 };
 
@@ -1774,7 +1870,7 @@ function _renderBuildingCards() {
         const total  = (campusDevices || []).filter(d => d.building === bName).length;
         const online = (campusDevices || []).filter(d => d.building === bName && d.status === 'Online').length;
         const imgSrc = BUILDING_IMAGE_MAP[bName] || '../images/unknown.png';
-        const hasFloorPlan = (bName === 'IC Building');
+        const hasFloorPlan = hasBuildingFloorPlan(bName);
 
         const card = document.createElement('div');
         card.style.cssText = [
@@ -1825,16 +1921,8 @@ window.showBuildingFloorPlan = function showBuildingFloorPlan(bName) {
     const buildingFilter = document.getElementById('building-filter');
     if (buildingFilter) buildingFilter.value = bName;
 
-    renderFloorMap();
-
-    if (floorDotsEnabled) {
-        const overlayIds = ['floor-dot-overlay-1', 'floor-dot-overlay-2'];
-        overlayIds.forEach(id => {
-            const el = document.getElementById(id);
-            if (el) el.style.display = 'block';
-        });
-        requestAnimationFrame(() => requestAnimationFrame(renderFloorMapDots));
-    }
+    // applyBuildingFloorImgs builds the panel, calls renderFloorMap and dots internally
+    applyBuildingFloorImgs(bName);
 };
 
 window.switchFloor = function (floorNum) {
@@ -1992,9 +2080,12 @@ function renderRealtimeFloorMap() {
 }
 
 function renderFloorMapDots() {
+    // SVG natural dimensions for IC Building floor plans (used by REALTIME_ROOMS coordinate system)
+    const IC_SVG_DIMS = { 1: { w: 920, h: 520 }, 2: { w: 1020, h: 520 } };
+    const dims = IC_SVG_DIMS[_currentFloorNum] || { w: 920, h: 520 };
     _renderRoomDotsOnConfig([
-        { floorKey: '1st floor', svgW: 920, svgH: 520, wrapperId: 'floor-map-1', overlayId: 'floor-dot-overlay-1' },
-        { floorKey: '2nd floor', svgW: 1020, svgH: 520, wrapperId: 'floor-map-2', overlayId: 'floor-dot-overlay-2' }
+        { floorKey: _floorKey(_currentFloorNum), svgW: dims.w, svgH: dims.h,
+          wrapperId: 'floor-map-active', overlayId: 'floor-dot-overlay-active' }
     ]);
 }
 

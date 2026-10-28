@@ -100,34 +100,20 @@
 
                         <!-- Step 2: Floor plan for selected building -->
                         <div id="floor-plan-view" style="display:none; flex-direction:column; height:100%; box-sizing:border-box;">
-                            <div style="padding:8px 14px; background:#1a3a6e; color:white; display:flex; align-items:center; gap:12px; flex-shrink:0;">
-                                <button onclick="showBuildingPicker()" style="background:none; border:1px solid rgba(255,255,255,0.55); color:white; border-radius:5px; padding:4px 12px; cursor:pointer; font-size:12px; font-family:inherit;">&#8592; Back</button>
-                                <span id="floor-plan-building-name" style="font-weight:700; font-family:'Sora',sans-serif; font-size:13px;"></span>
+                            <div style="padding:8px 14px; background:#1a3a6e; color:white; display:flex; align-items:center; gap:10px; flex-shrink:0; min-height:46px; overflow:hidden;">
+                                <button onclick="showBuildingPicker()" style="background:none; border:1px solid rgba(255,255,255,0.55); color:white; border-radius:5px; padding:4px 12px; cursor:pointer; font-size:12px; font-family:inherit; flex-shrink:0;">&#8592; Back</button>
+                                <span id="floor-plan-building-name" style="font-weight:700; font-family:'Sora',sans-serif; font-size:13px; flex-shrink:0;"></span>
+                                <!-- Floor selector tabs – populated by JS -->
+                                <div id="floor-tabs-bar" style="display:flex; gap:4px; overflow-x:auto; flex:1; align-items:center; scrollbar-width:none;"></div>
                                 <!-- Live Devices toggle -->
                                 <button id="floor-dots-toggle" onclick="toggleFloorDots()"
-                                        style="margin-left:auto; display:flex; align-items:center; gap:8px; background:rgba(255,255,255,0.12); border:1px solid rgba(255,255,255,0.35); color:white; border-radius:6px; padding:4px 12px; cursor:pointer; font-size:12px; font-weight:600; font-family:inherit; white-space:nowrap; transition:background 0.2s;">
+                                        style="flex-shrink:0; display:flex; align-items:center; gap:8px; background:rgba(255,255,255,0.12); border:1px solid rgba(255,255,255,0.35); color:white; border-radius:6px; padding:4px 12px; cursor:pointer; font-size:12px; font-weight:600; font-family:inherit; white-space:nowrap; transition:background 0.2s;">
                                     <span id="floor-dots-knob" style="display:inline-block; width:10px; height:10px; border-radius:50%; background:#aaa; transition:background 0.2s; flex-shrink:0;"></span>
                                     Live Devices
                                 </button>
                             </div>
-                            <div style="display:flex; gap:12px; padding:12px; flex:1; box-sizing:border-box; min-height:0;">
-                                <div style="flex:1; display:flex; flex-direction:column; background:white; border-radius:8px; overflow:hidden; box-shadow:0 2px 8px rgba(0,0,0,0.12); min-width:0;">
-                                    <div id="floor-map-1" style="flex:1; position:relative; overflow:hidden;">
-                                        <img src="../images/1stFloor.svg" alt="Ground Floor" draggable="false"
-                                             style="width:100%; height:100%; object-fit:contain; display:block; pointer-events:none; user-select:none;">
-                                        <div id="floor-dot-overlay-1" style="position:absolute; inset:0; pointer-events:none; display:none;"></div>
-                                    </div>
-                                    <div style="text-align:center; padding:8px 0; background:#1a3a6e; color:white; font-weight:700; font-size:13px; letter-spacing:0.5px;">1ST FLOOR</div>
-                                </div>
-                                <div style="flex:1; display:flex; flex-direction:column; background:white; border-radius:8px; overflow:hidden; box-shadow:0 2px 8px rgba(0,0,0,0.12); min-width:0;">
-                                    <div id="floor-map-2" style="flex:1; position:relative; overflow:hidden;">
-                                        <img src="../images/2ndFloor.svg" alt="2nd Floor" draggable="false"
-                                             style="width:100%; height:100%; object-fit:contain; display:block; pointer-events:none; user-select:none;">
-                                        <div id="floor-dot-overlay-2" style="position:absolute; inset:0; pointer-events:none; display:none;"></div>
-                                    </div>
-                                    <div style="text-align:center; padding:8px 0; background:#1a3a6e; color:white; font-weight:700; font-size:13px; letter-spacing:0.5px;">2ND FLOOR</div>
-                                </div>
-                            </div>
+                            <!-- Single floor panel – built dynamically by applyBuildingFloorImgs -->
+                            <div id="floor-panel-container" style="display:flex; padding:12px; flex:1; box-sizing:border-box; min-height:0;"></div>
                         </div>
 
                     </div>

@@ -3212,6 +3212,117 @@ app.put('/api/auth/profile', requireAuth, async (req, res) => {
 
 // ---- User Management (Admin only) ----
 
+// ── Location / topology-area management ──────────────────────────────────────
+
+app.get('/api/locations', requireAuth, async (req, res) => {
+  try {
+    const [rows] = await dbPool.execute(
+      `SELECT l."LocationID", l."BuildingName", l."Floor", l."Room",
+              COUNT(d."DeviceID") AS "DeviceCount"
+       FROM "LOCATION" l
+       LEFT JOIN "DEVICE" d ON d."LocationID" = l."LocationID"
+       GROUP BY l."LocationID", l."BuildingName", l."Floor", l."Room"
+       ORDER BY l."BuildingName", l."Floor", l."Room"`
+    );
+    return res.json(rows.map(r => ({
+      id:       r.LocationID,
+      building: r.BuildingName || '',
+      floor:    r.Floor || '',
+      room:     r.Room || '',
+      devices:  Number(r.DeviceCount) || 0,
+    })));
+  } catch (err) {
+    console.error('GET /api/locations error:', err);
+    return res.status(500).json({ error: 'Failed to load locations.' });
+  }
+});
+
+app.post('/api/locations', requireAuth, requireRole('Admin'), async (req, res) => {
+  const building = typeof req.body?.building === 'string' ? req.body.building.trim() : '';
+  const floor    = typeof req.body?.floor    === 'string' ? req.body.floor.trim()    : '';
+  const room     = typeof req.body?.room     === 'string' ? req.body.room.trim()     : '';
+  if (!building) return res.status(400).json({ error: 'Building name is required.' });
+  try {
+    const id = await findOrCreateLocationId(building, floor || null, room || null);
+    logActivity(req, 'location_created', `LocationID: ${id}, Building: ${building}`);
+    return res.json({ id, building, floor, room, devices: 0 });
+  } catch (err) {
+    console.error('POST /api/locations error:', err);
+    return res.status(500).json({ error: 'Failed to create location.' });
+  }
+});
+
+app.get('/api/locations/:id/devices', requireAuth, async (req, res) => {
+  const locId = Number(req.params.id);
+  if (!Number.isInteger(locId) || locId <= 0) return res.status(400).json({ error: 'Invalid ID.' });
+  try {
+    const [rows] = await dbPool.execute(
+      `SELECT d."DeviceID", d."DeviceName", d."IPAddress", d."MACAddress", d."DeviceType", d."Status", d."LastSeen"
+       FROM "DEVICE" d
+       WHERE d."LocationID" = ?
+       ORDER BY d."DeviceName", d."IPAddress"`,
+      [locId]
+    );
+    return res.json(rows.map(r => ({
+      id:      r.DeviceID,
+      name:    r.DeviceName || r.IPAddress,
+      ip:      r.IPAddress,
+      mac:     r.MACAddress || 'N/A',
+      type:    r.DeviceType || 'Endpoint',
+      status:  r.Status || 'Unknown',
+      lastSeen: r.LastSeen,
+    })));
+  } catch (err) {
+    console.error('GET /api/locations/:id/devices error:', err);
+    return res.status(500).json({ error: 'Failed to load devices for location.' });
+  }
+});
+
+app.put('/api/locations/:id', requireAuth, requireRole('Admin'), async (req, res) => {
+  const locId    = Number(req.params.id);
+  if (!Number.isInteger(locId) || locId <= 0) return res.status(400).json({ error: 'Invalid ID.' });
+  const building = typeof req.body?.building === 'string' ? req.body.building.trim() : '';
+  const floor    = typeof req.body?.floor    === 'string' ? req.body.floor.trim()    : '';
+  const room     = typeof req.body?.room     === 'string' ? req.body.room.trim()     : '';
+  if (!building) return res.status(400).json({ error: 'Building name is required.' });
+  try {
+    const [existing] = await dbPool.execute(
+      'SELECT "LocationID" FROM "LOCATION" WHERE "LocationID" = ? LIMIT 1', [locId]
+    );
+    if (!existing.length) return res.status(404).json({ error: 'Location not found.' });
+    await dbPool.execute(
+      'UPDATE "LOCATION" SET "BuildingName" = ?, "Floor" = ?, "Room" = ? WHERE "LocationID" = ?',
+      [building, floor || null, room || null, locId]
+    );
+    logActivity(req, 'location_updated', `LocationID: ${locId}, Building: ${building}`);
+    return res.json({ id: locId, building, floor, room });
+  } catch (err) {
+    console.error('PUT /api/locations/:id error:', err);
+    return res.status(500).json({ error: 'Failed to update location.' });
+  }
+});
+
+app.delete('/api/locations/:id', requireAuth, requireRole('Admin'), async (req, res) => {
+  const locId = Number(req.params.id);
+  if (!Number.isInteger(locId) || locId <= 0) return res.status(400).json({ error: 'Invalid ID.' });
+  try {
+    const [devs] = await dbPool.execute(
+      'SELECT COUNT(*) AS cnt FROM "DEVICE" WHERE "LocationID" = ?', [locId]
+    );
+    if (Number(devs[0]?.cnt) > 0) {
+      return res.status(409).json({ error: 'Cannot delete: devices are assigned to this location.' });
+    }
+    await dbPool.execute('DELETE FROM "LOCATION" WHERE "LocationID" = ?', [locId]);
+    logActivity(req, 'location_deleted', `LocationID: ${locId}`);
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error('DELETE /api/locations/:id error:', err);
+    return res.status(500).json({ error: 'Failed to delete location.' });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 // List all user accounts
 app.get('/api/users', requireAuth, requireRole('Admin'), async (req, res) => {
   try {
@@ -3329,10 +3440,132 @@ async function initBroadcastChannel() {
 }
 
 // Refuse to serve traffic until the explicit database migration has completed.
+async function ensureFloorPlansTable() {
+  await postgresPool.query(`
+    CREATE TABLE IF NOT EXISTS public."BUILDING_FLOOR_PLANS" (
+      "BuildingName" text NOT NULL,
+      "FloorNumber"  integer NOT NULL,
+      "ImageURL"     text NOT NULL,
+      "UpdatedAt"    timestamptz NOT NULL DEFAULT now(),
+      PRIMARY KEY ("BuildingName", "FloorNumber")
+    )
+  `);
+  // Seed IC Building defaults if missing
+  const { rows } = await postgresPool.query(
+    `SELECT "BuildingName" FROM public."BUILDING_FLOOR_PLANS" WHERE "BuildingName" = 'IC Building' LIMIT 1`
+  );
+  if (!rows.length) {
+    await postgresPool.query(`
+      INSERT INTO public."BUILDING_FLOOR_PLANS" ("BuildingName","FloorNumber","ImageURL") VALUES
+        ('IC Building', 1, '/images/1stFloor.svg'),
+        ('IC Building', 2, '/images/2ndFloor.svg')
+      ON CONFLICT DO NOTHING
+    `);
+  }
+}
+
+// ── Floor plan management endpoints ─────────────────────────────────────────
+
+app.get('/api/floor-plans', requireAuth, async (req, res) => {
+  try {
+    const [rows] = await dbPool.execute(
+      `SELECT "BuildingName", "FloorNumber", "ImageURL" FROM "BUILDING_FLOOR_PLANS" ORDER BY "BuildingName", "FloorNumber"`
+    );
+    // Return as { [building]: { 1: url, 2: url } }
+    const map = {};
+    rows.forEach(r => {
+      if (!map[r.BuildingName]) map[r.BuildingName] = {};
+      map[r.BuildingName][r.FloorNumber] = r.ImageURL;
+    });
+    return res.json(map);
+  } catch (err) {
+    console.error('GET /api/floor-plans error:', err);
+    return res.status(500).json({ error: 'Failed to load floor plans.' });
+  }
+});
+
+app.post('/api/floor-plans', requireAuth, requireRole('Admin'),
+  express.json({ limit: '12mb' }),
+  async (req, res) => {
+    const { building, floor, imageData, imageExt } = req.body || {};
+    if (!building || !floor || !imageData || !imageExt) {
+      return res.status(400).json({ error: 'building, floor, imageData, and imageExt are required.' });
+    }
+    const floorNum = Number(floor);
+    if (!Number.isInteger(floorNum) || floorNum < 1) return res.status(400).json({ error: 'floor must be a positive integer.' });
+    const allowed = ['jpg','jpeg','png','svg','webp'];
+    const ext = String(imageExt).toLowerCase().replace(/^\./, '');
+    if (!allowed.includes(ext)) return res.status(400).json({ error: `File type .${ext} is not allowed.` });
+
+    try {
+      const slug     = building.toLowerCase().replace(/[^a-z0-9]/g, '_');
+      const filename = `${slug}_floor${floorNum}.${ext}`;
+      const buf      = Buffer.from(imageData, 'base64');
+      const imgDir   = path.join(__dirname, '..', 'images', 'floorplans');
+      fs.mkdirSync(imgDir, { recursive: true });
+      fs.writeFileSync(path.join(imgDir, filename), buf);
+      // Mirror to public/images/floorplans/ (served statically)
+      const pubDir = path.join(__dirname, '..', 'public', 'images', 'floorplans');
+      fs.mkdirSync(pubDir, { recursive: true });
+      fs.writeFileSync(path.join(pubDir, filename), buf);
+
+      const imageURL = `/images/floorplans/${filename}`;
+      await dbPool.execute(
+        `INSERT INTO "BUILDING_FLOOR_PLANS" ("BuildingName","FloorNumber","ImageURL","UpdatedAt")
+         VALUES (?,?,?,NOW())
+         ON CONFLICT ("BuildingName","FloorNumber") DO UPDATE
+         SET "ImageURL" = EXCLUDED."ImageURL", "UpdatedAt" = NOW()`,
+        [building, floorNum, imageURL]
+      );
+      logActivity(req, 'floor_plan_uploaded', `Building: ${building}, Floor: ${floorNum}, File: ${filename}`);
+      return res.json({ ok: true, url: imageURL });
+    } catch (err) {
+      console.error('POST /api/floor-plans error:', err);
+      return res.status(500).json({ error: 'Failed to save floor plan.' });
+    }
+  }
+);
+
+app.delete('/api/floor-plans/:building/:floor', requireAuth, requireRole('Admin'), async (req, res) => {
+  const building = req.params.building;
+  const floorNum = Number(req.params.floor);
+  if (!Number.isInteger(floorNum) || floorNum < 1) return res.status(400).json({ error: 'floor must be a positive integer.' });
+  if (building === 'IC Building') return res.status(403).json({ error: 'Cannot remove the built-in IC Building floor plans.' });
+  try {
+    const [existing] = await dbPool.execute(
+      'SELECT "ImageURL" FROM "BUILDING_FLOOR_PLANS" WHERE "BuildingName" = ? AND "FloorNumber" = ? LIMIT 1',
+      [building, floorNum]
+    );
+    if (!existing.length) return res.status(404).json({ error: 'Floor plan not found.' });
+    // Delete file if it is in our upload directory (not a built-in)
+    const url = existing[0].ImageURL;
+    if (url.startsWith('/images/floorplans/')) {
+      const filename = path.basename(url);
+      const targets = [
+        path.join(__dirname, '..', 'images', 'floorplans', filename),
+        path.join(__dirname, '..', 'public', 'images', 'floorplans', filename),
+      ];
+      targets.forEach(p => { try { fs.unlinkSync(p); } catch (_) {} });
+    }
+    await dbPool.execute(
+      'DELETE FROM "BUILDING_FLOOR_PLANS" WHERE "BuildingName" = ? AND "FloorNumber" = ?',
+      [building, floorNum]
+    );
+    logActivity(req, 'floor_plan_deleted', `Building: ${building}, Floor: ${floorNum}`);
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error('DELETE /api/floor-plans error:', err);
+    return res.status(500).json({ error: 'Failed to delete floor plan.' });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 async function startServer() {
   try {
     const { rows } = await postgresPool.query("SELECT version FROM public.smartcampus_migrations WHERE version = '002_sessions'");
     if (!rows.length) throw new Error('Run npm run db:migrate before starting the server.');
+    await ensureFloorPlansTable();
     httpServer.listen(PORT, () => {
       console.log(`SmartCampus API running on http://localhost:${PORT} (Supabase PostgreSQL)`);
       startScheduledScans();

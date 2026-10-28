@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Management | SmartCampus SecureNet</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Sora:wght@500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="../css/pages/devices.css">
+    <style>
+        /* ── Filter bar card ─────────────────────────────────────────── */
+        .mgmt-filter-card {
+            background: rgba(255,255,255,0.86);
+            border: 1px solid #d9e6f4;
+            border-radius: 14px;
+            box-shadow: 0 4px 14px rgba(25,57,93,0.07);
+            padding: 0.75rem 1rem;
+            margin-bottom: 0.85rem;
+            backdrop-filter: blur(5px);
+        }
+        .mgmt-filter-bar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.55rem;
+            align-items: center;
+        }
+
+        /* Search */
+        .mgmt-search-wrap {
+            position: relative;
+            flex: 1 1 200px;
+            min-width: 160px;
+        }
+        .mgmt-search-wrap .mgmt-search-icon {
+            position: absolute; left: 0.8rem; top: 50%;
+            transform: translateY(-50%);
+            color: #8ba5be; pointer-events: none; font-size: 0.78rem;
+        }
+        .mgmt-search-wrap input {
+            width: 100%;
+            padding: 0.42rem 0.9rem 0.42rem 2.2rem;
+            border: 1px solid #d4e2f2;
+            border-radius: 10px;
+            font-size: 0.84rem;
+            font-family: inherit;
+            color: #1b3857;
+            background: #f8fbff;
+            transition: border-color 0.18s, box-shadow 0.18s;
+            height: 36px;
+        }
+        .mgmt-search-wrap input:focus {
+            border-color: #1db862;
+            box-shadow: 0 0 0 0.2rem rgba(29,184,98,0.14);
+            background: #fff;
+            outline: none;
+        }
+        .mgmt-search-wrap input::placeholder { color: #9ab0c6; }
+
+        /* Select wrappers */
+        .mgmt-select-wrap {
+            position: relative;
+            flex: 0 1 auto;
+            min-width: 140px;
+        }
+        .mgmt-select-wrap .mgmt-select-icon {
+            position: absolute; left: 0.75rem; top: 50%;
+            transform: translateY(-50%);
+            color: #8ba5be; pointer-events: none; font-size: 0.75rem;
+            z-index: 1;
+        }
+        .mgmt-select {
+            width: 100%;
+            padding: 0.42rem 2rem 0.42rem 2.1rem;
+            border: 1px solid #d4e2f2;
+            border-radius: 10px;
+            font-size: 0.84rem;
+            font-family: inherit;
+            color: #1b3857;
+            background: #f8fbff;
+            appearance: none;
+            -webkit-appearance: none;
+            cursor: pointer;
+            height: 36px;
+            transition: border-color 0.18s, box-shadow 0.18s;
+        }
+        .mgmt-select:focus {
+            border-color: #1db862;
+            box-shadow: 0 0 0 0.2rem rgba(29,184,98,0.14);
+            background: #fff;
+            outline: none;
+        }
+        /* Custom chevron */
+        .mgmt-select-wrap::after {
+            content: '\f078';
+            font-family: 'Font Awesome 6 Free';
+            font-weight: 900;
+            font-size: 0.65rem;
+            color: #8ba5be;
+            position: absolute;
+            right: 0.7rem; top: 50%;
+            transform: translateY(-50%);
+            pointer-events: none;
+        }
+
+        /* Reset button */
+        .mgmt-reset-btn {
+            height: 36px;
+            padding: 0 0.9rem;
+            border: 1px solid #d4e2f2;
+            border-radius: 10px;
+            background: #f8fbff;
+            color: #5e7692;
+            font-size: 0.82rem;
+            font-family: inherit;
+            font-weight: 600;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: background 0.18s, border-color 0.18s, color 0.18s;
+            display: flex; align-items: center; gap: 0.35rem;
+        }
+        .mgmt-reset-btn:hover {
+            background: #fff0f0;
+            border-color: #f0baba;
+            color: #c0392b;
+        }
+
+        /* Divider between search and selects */
+        .mgmt-filter-divider {
+            width: 1px; height: 22px;
+            background: #d9e6f4;
+            flex-shrink: 0;
+            align-self: center;
+        }
+
+        /* Count / toggle row */
+        .mgmt-count-row {
+            display: flex; align-items: center; justify-content: space-between;
+            margin-bottom: 0.55rem;
+            font-size: 0.82rem; color: #5e7692;
+            padding: 0 0.1rem;
+        }
+        .mgmt-see-all-btn {
+            background: none; border: none;
+            color: #1f7ae0; font-size: 0.82rem;
+            font-weight: 600; cursor: pointer;
+            padding: 0; font-family: inherit;
+            display: flex; align-items: center; gap: 0.3rem;
+        }
+        .mgmt-see-all-btn:hover { text-decoration: underline; }
+
+        @media (max-width: 640px) {
+            .mgmt-filter-bar { flex-direction: column; align-items: stretch; }
+            .mgmt-filter-divider { display: none; }
+            .mgmt-select-wrap { min-width: 0; }
+        }
+    </style>
+</head>
+
+<body class="sidebar-layout">
+    <script>window.pageRequiredRole = 'Admin';</script>
+    <div id="sidebar-container"></div>
+    <nav class="navbar navbar-expand-lg top-navbar">
+        <div class="container-fluid">
+            <button class="navbar-toggler" type="button" onclick="toggleSidebar()"><span class="navbar-toggler-icon"></span></button>
+            <h5 class="mb-0 text-secondary" id="page-title">Management</h5>
+        </div>
+    </nav>
+
+    <div class="main-content">
+
+        <!-- Hero banner -->
+        <div class="devices-hero mb-4">
+            <div class="devices-hero-text">
+                <div class="devices-hero-eyebrow">Campus Infrastructure</div>
+                <h4 class="devices-hero-title">Topology Management</h4>
+                <p class="devices-hero-sub mb-0">Assign and edit location details for each campus network device.</p>
+            </div>
+            <div class="devices-hero-right">
+                <div class="devices-hero-stats">
+                    <div class="dstat-pill">
+                        <span class="dstat-value" id="mg-total">--</span>
+                        <span class="dstat-label">Total</span>
+                    </div>
+                    <div class="dstat-pill dstat-online">
+                        <span class="dstat-value" id="mg-assigned">--</span>
+                        <span class="dstat-label">Assigned</span>
+                    </div>
+                    <div class="dstat-pill dstat-offline">
+                        <span class="dstat-value" id="mg-unassigned">--</span>
+                        <span class="dstat-label">Unassigned</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab switcher -->
+        <ul class="nav nav-tabs mb-3" id="mgmt-tabs">
+            <li class="nav-item">
+                <button class="nav-link active fw-semibold" id="tab-devices-btn" onclick="mgmt.switchTab('devices')">
+                    <i class="fas fa-server me-1"></i>Device Locations
+                </button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link fw-semibold" id="tab-floorplans-btn" onclick="mgmt.switchTab('floorplans')">
+                    <i class="fas fa-map me-1"></i>Floor Plans
+                </button>
+            </li>
+        </ul>
+
+        <div id="mgmt-error"   class="alert alert-danger  d-none mb-3"></div>
+        <div id="mgmt-success" class="alert alert-success d-none mb-3"></div>
+
+        <!-- Filter bar -->
+        <div class="mgmt-filter-card">
+            <div class="mgmt-filter-bar">
+                <div class="mgmt-search-wrap">
+                    <i class="fas fa-search mgmt-search-icon"></i>
+                    <input type="text" id="mgmt-search" placeholder="Search device name or IP address…" oninput="mgmt.applyFilters()">
+                </div>
+
+                <div class="mgmt-filter-divider"></div>
+
+                <div class="mgmt-select-wrap">
+                    <i class="fas fa-layer-group mgmt-select-icon"></i>
+                    <select class="mgmt-select" id="mgmt-type-filter" onchange="mgmt.applyFilters()">
+                        <option value="">All Types</option>
+                    </select>
+                </div>
+
+                <div class="mgmt-select-wrap">
+                    <i class="fas fa-map-marker-alt mgmt-select-icon"></i>
+                    <select class="mgmt-select" id="mgmt-area-filter" onchange="mgmt.applyFilters()">
+                        <option value="">All Areas</option>
+                    </select>
+                </div>
+
+                <button class="mgmt-reset-btn" onclick="mgmt.resetFilters()" title="Clear all filters">
+                    <i class="fas fa-times"></i> Reset
+                </button>
+            </div>
+        </div>
+
+        <!-- Count + see-all toggle -->
+        <div class="mgmt-count-row">
+            <span id="mgmt-count-label"></span>
+            <button class="mgmt-see-all-btn" id="mgmt-toggle-btn" onclick="mgmt.toggleSeeAll()" style="display:none;">
+                <i class="fas fa-chevron-down" id="mgmt-toggle-icon" style="font-size:0.65rem;"></i>
+                <span id="mgmt-toggle-text"></span>
+            </button>
+        </div>
+
+        <div class="card panel-card p-3">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle" id="mgmt-table">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Device Name</th>
+                            <th>Type</th>
+                            <th>IP Address</th>
+                            <th>MAC Address</th>
+                            <th>Location</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td colspan="6" class="text-center text-muted py-4"><i class="fas fa-spinner fa-spin me-2"></i>Loading devices…</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Floor Plans panel (hidden by default) -->
+        <div id="mgmt-floorplans-panel" style="display:none;">
+            <div class="d-flex align-items-center justify-content-between mb-3">
+                <p class="text-muted small mb-0">Assign floor plan images to each building. Uploaded plans appear in the Topology Map when that building is selected.</p>
+                <button class="btn btn-primary btn-sm" onclick="mgmt.openUpload()">
+                    <i class="fas fa-upload me-1"></i>Upload Floor Plan
+                </button>
+            </div>
+            <div class="row g-3" id="fp-building-grid">
+                <div class="col-12 text-center text-muted py-4"><i class="fas fa-spinner fa-spin me-2"></i>Loading…</div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- View / Edit Modal -->
+    <div class="modal fade" id="mgmtEditModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content device-modal-content">
+                <div class="modal-header border-0 pb-1">
+                    <div>
+                        <h5 class="modal-title mb-0" id="mgmt-modal-device-name">—</h5>
+                        <div class="device-modal-meta small" id="mgmt-modal-device-meta"></div>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body pt-2">
+                    <div id="mgmt-modal-error" class="alert alert-danger d-none small py-2 mb-3"></div>
+
+                    <!-- View mode -->
+                    <div id="mgmt-view-mode">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h6 class="section-title mb-0">Device Overview</h6>
+                            <button class="btn btn-sm btn-outline-primary" onclick="mgmt.startEdit()">
+                                <i class="fas fa-pen me-1"></i>Edit Details
+                            </button>
+                        </div>
+                        <ul class="device-detail-list">
+                            <li><span class="device-detail-label">Name</span><strong id="vw-name">—</strong></li>
+                            <li><span class="device-detail-label">Type</span><span id="vw-type">—</span></li>
+                            <li><span class="device-detail-label">IP Address</span><span id="vw-ip">—</span></li>
+                            <li><span class="device-detail-label">MAC Address</span><span id="vw-mac">—</span></li>
+                            <li><span class="device-detail-label">Location</span><span id="vw-location">—</span></li>
+                            <li><span class="device-detail-label">Building</span><span id="vw-building">—</span></li>
+                            <li><span class="device-detail-label">Floor</span><span id="vw-floor">—</span></li>
+                            <li><span class="device-detail-label">Room / Area</span><span id="vw-room">—</span></li>
+                            <li><span class="device-detail-label">Last Detected</span><span id="vw-lastseen">—</span></li>
+                        </ul>
+                    </div>
+
+                    <!-- Edit mode -->
+                    <div id="mgmt-edit-mode" style="display:none;">
+                        <h6 class="section-title mb-3">Edit Location Details</h6>
+                        <div class="row g-2 mb-2">
+                            <div class="col-md-6">
+                                <label class="form-label small text-muted fw-semibold">Device Name <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="edit-name" maxlength="120">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small text-muted fw-semibold">Device Type <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="edit-type" maxlength="60">
+                            </div>
+                        </div>
+                        <div class="row g-2 mt-1">
+                            <div class="col-md-4">
+                                <label class="form-label small text-muted fw-semibold">Building</label>
+                                <input type="text" class="form-control" id="edit-building" placeholder="e.g. IC Building" maxlength="120">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small text-muted fw-semibold">Floor</label>
+                                <input type="text" class="form-control" id="edit-floor" placeholder="e.g. 2" maxlength="50">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small text-muted fw-semibold">Room / Area</label>
+                                <input type="text" class="form-control" id="edit-room" placeholder="e.g. Maclab" maxlength="80">
+                            </div>
+                        </div>
+                        <div class="d-flex gap-2 mt-3">
+                            <button class="btn btn-primary btn-sm" id="mgmt-save-btn" onclick="mgmt.save()">
+                                <i class="fas fa-save me-1"></i>Save Changes
+                            </button>
+                            <button class="btn btn-outline-secondary btn-sm" onclick="mgmt.cancelEdit()">Cancel</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Upload Floor Plan Modal -->
+    <div class="modal fade" id="fpUploadModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content device-modal-content">
+                <div class="modal-header border-0 pb-1">
+                    <h5 class="modal-title">Upload Floor Plan</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="fp-upload-error" class="alert alert-danger d-none small py-2 mb-3"></div>
+                    <div class="mb-3">
+                        <label class="form-label small text-muted fw-semibold">Building <span class="text-danger">*</span></label>
+                        <select class="form-select form-select-sm" id="fp-building" onchange="mgmt.onBuildingSelectChange()">
+                            <option value="">— Select building —</option>
+                        </select>
+                        <div id="fp-new-building-wrap" style="display:none; margin-top:0.5rem;">
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text"><i class="fas fa-building" style="font-size:0.75rem;"></i></span>
+                                <input type="text" class="form-control" id="fp-new-building" placeholder="Enter new building name…" maxlength="120">
+                            </div>
+                            <div class="form-text">This building will be created when you upload the floor plan.</div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small text-muted fw-semibold">Floor Number <span class="text-danger">*</span></label>
+                        <input type="number" class="form-control form-control-sm" id="fp-floor" min="1" max="99" value="1">
+                        <div class="form-text">Enter the floor number (1 = ground floor, 2 = second floor, 3 = third floor, etc.)</div>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label small text-muted fw-semibold">Floor Plan Image <span class="text-danger">*</span></label>
+                        <input type="file" class="form-control form-control-sm" id="fp-file"
+                               accept=".jpg,.jpeg,.png,.svg,.webp">
+                        <div class="form-text">Accepted: JPG, PNG, SVG, WebP · Max 10 MB.</div>
+                    </div>
+                    <div id="fp-preview-wrap" style="display:none;margin-top:0.75rem;">
+                        <img id="fp-preview" src="" alt="Preview"
+                             style="max-width:100%;max-height:180px;border-radius:8px;border:1px solid #d4e2f2;object-fit:contain;display:block;margin:0 auto;">
+                    </div>
+                </div>
+                <div class="modal-footer border-0 pt-0">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary btn-sm px-4" id="fp-save-btn" onclick="mgmt.saveFloorPlan()">
+                        <i class="fas fa-upload me-1"></i>Upload
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/socket.io-client@4.7.5/dist/socket.io.min.js"></script>
+    <script src="../js/script.js"></script>
+    <script src="../js/management.js"></script>
+    <script type="module" src="../js/auth.js"></script>
+</body>
+
+</html>
