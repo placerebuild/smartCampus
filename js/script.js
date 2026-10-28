@@ -803,17 +803,20 @@ function populateRecentAlerts() {
 }
 
 async function populateAlertsTable() {
-    const tbody = document.querySelector('#alerts-table tbody');
-    if (!tbody) return;
-
+    // Always fetch so alertsData stays fresh for stat cards and recent-alerts feed
+    // even on pages that don't have the full alerts table (e.g. dashboard).
     try {
         const res = await fetch(getTopologyApiBase() + '/api/alerts', { credentials: 'include' });
         if (res.ok) {
             alertsData = await res.json();
             updateAlertBadge();
+            populateRecentAlerts();
             if (typeof updateStatCards === 'function') updateStatCards();
         }
     } catch (e) { /* keep alertsData as-is */ }
+
+    const tbody = document.querySelector('#alerts-table tbody');
+    if (!tbody) return;
 
     // Filter by today or all
     const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
