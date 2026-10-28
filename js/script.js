@@ -2572,6 +2572,7 @@ function createStatusChart(onlineCount, offlineCount, unknownCount) {
         },
         options: {
             responsive: true,
+            maintainAspectRatio: false,
             cutout: '62%',
             plugins: {
                 title: {
