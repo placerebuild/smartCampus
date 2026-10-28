@@ -103,31 +103,14 @@
             </div>
         </div>
 
-        <!-- Main panel row: Left (chart + ARP) | Center (ICMP) | Right (Alerts) -->
-        <div class="row g-2 align-items-stretch">
+        <!-- Main panel row: Left (chart) | Center (ICMP) | Right (Alerts) -->
+        <div class="row g-2 align-items-stretch mb-2">
 
-            <!-- LEFT: Device Status on top, ARP Table below -->
-            <div class="col-12 col-lg-3 d-flex flex-column gap-2">
-                <div class="card p-2 panel-card">
-                    <div class="section-title mb-1" style="font-size:0.78rem;">Device Status</div>
-                    <canvas id="statusChart" height="155"></canvas>
-                </div>
-                <div class="card p-2 panel-card flex-fill">
-                    <div class="d-flex justify-content-between align-items-center mb-1">
-                        <div class="section-title mb-0" style="font-size:0.78rem;"><i class="fas fa-ethernet me-1 text-success"></i>ARP Table</div>
-                        <span class="badge bg-success-subtle text-success border border-success-subtle" style="font-size:0.65rem;" id="arp-count">0</span>
-                    </div>
-                    <p class="text-muted mb-1" style="font-size:0.68rem;">IP → MAC mappings discovered on campus subnet.</p>
-                    <div style="overflow-y:auto;max-height:140px;">
-                        <table class="table table-sm table-hover mb-0" id="arp-table">
-                            <thead class="table-light" style="font-size:0.67rem;">
-                                <tr><th>IP</th><th>MAC</th><th>Type</th><th>Name</th><th>Last Seen</th></tr>
-                            </thead>
-                            <tbody id="arp-tbody">
-                                <tr><td colspan="5" class="text-center text-muted py-2" style="font-size:0.72rem;"><i class="fas fa-spinner fa-spin me-1"></i>Loading…</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
+            <!-- LEFT: Total Devices donut chart -->
+            <div class="col-12 col-lg-4">
+                <div class="card p-2 panel-card h-100">
+                    <div class="section-title mb-1" style="font-size:0.78rem;">Total Devices</div>
+                    <canvas id="statusChart" height="180"></canvas>
                 </div>
             </div>
 
@@ -135,7 +118,7 @@
             <div class="col-12 col-lg-5">
                 <div class="card p-2 panel-card h-100">
                     <div class="d-flex justify-content-between align-items-center mb-1">
-                        <div class="section-title mb-0" style="font-size:0.78rem;"><i class="fas fa-satellite-dish me-1 text-info"></i>ICMP Results</div>
+                        <div class="section-title mb-0" style="font-size:0.78rem;"><i class="fas fa-satellite-dish me-1 text-info"></i>ICMP Result</div>
                         <span class="badge bg-info-subtle text-info border border-info-subtle" style="font-size:0.65rem;" id="icmp-count">0</span>
                     </div>
                     <p class="text-muted mb-1" style="font-size:0.68rem;">Live ICMP echo — reachability and round-trip latency per device.</p>
@@ -153,15 +136,38 @@
             </div>
 
             <!-- RIGHT: Recent Alerts -->
-            <div class="col-12 col-lg-4">
+            <div class="col-12 col-lg-3">
                 <div class="card p-2 panel-card h-100">
                     <div class="section-title mb-1" style="font-size:0.78rem;">Recent Alerts</div>
-                    <div style="overflow-y:auto;max-height:440px;">
+                    <div style="overflow-y:auto;max-height:320px;">
                         <ul class="list-group list-group-flush" id="recent-alerts"></ul>
                     </div>
                 </div>
             </div>
 
+        </div>
+
+        <!-- BOTTOM ROW: ARP Table full width -->
+        <div class="row g-2">
+            <div class="col-12">
+                <div class="card p-2 panel-card">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <div class="section-title mb-0" style="font-size:0.78rem;"><i class="fas fa-ethernet me-1 text-success"></i>ARP Table</div>
+                        <span class="badge bg-success-subtle text-success border border-success-subtle" style="font-size:0.65rem;" id="arp-count">0 entries</span>
+                    </div>
+                    <p class="text-muted mb-1" style="font-size:0.68rem;">IP → MAC mappings discovered on campus subnet.</p>
+                    <div style="overflow-y:auto;max-height:130px;">
+                        <table class="table table-sm table-hover mb-0" id="arp-table">
+                            <thead class="table-light" style="font-size:0.67rem;position:sticky;top:0;">
+                                <tr><th>IP Address</th><th>MAC Address</th><th>Type</th><th>Device Name</th><th>Last Seen</th></tr>
+                            </thead>
+                            <tbody id="arp-tbody">
+                                <tr><td colspan="5" class="text-center text-muted py-2" style="font-size:0.72rem;"><i class="fas fa-spinner fa-spin me-1"></i>Loading…</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
