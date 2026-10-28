@@ -1,11 +1,11 @@
 # SmartCampus SecureNet
-
+ 
 Real-time campus network monitoring and device management system for IC Building, DNSC.
-
+ 
 ---
-
+ 
 ## Table of Contents
-
+ 
 1. [Project Overview](#1-project-overview)
 2. [Features](#2-features)
 3. [Technology Stack](#3-technology-stack)
@@ -21,19 +21,18 @@ Real-time campus network monitoring and device management system for IC Building
 13. [Troubleshooting](#13-troubleshooting)
 14. [Deployment](#14-deployment)
 15. [Security Notes](#15-security-notes)
-
 ---
-
+ 
 ## 1. Project Overview
-
+ 
 SmartCampus SecureNet is a full-stack web application for monitoring campus network infrastructure in real time. It discovers devices connected to the campus subnet via ICMP ping, ARP table parsing, and optional SNMP queries, then tracks their availability, latency, and topology. Administrators and IT staff can view dashboards, manage devices, resolve alerts, and export reports.
-
-Target environment: IC Building network — DNSC (De La Salle University – Dasmariñas).
-
+ 
+Target environment: IC Building network — DNSC (Davao del Norte State College).
+ 
 ---
-
+ 
 ## 2. Features
-
+ 
 | Feature | Description |
 |---------|-------------|
 | Device Discovery | Automated ICMP ping sweep + ARP table scanning |
@@ -45,22 +44,22 @@ Target environment: IC Building network — DNSC (De La Salle University – Das
 | Audit Log | Complete activity trail with user, action, IP, and timestamp |
 | CSV Export | Export alert history and reports |
 | SNMP Support | Optional SNMP metadata collection from managed devices |
-
+ 
 ---
-
+ 
 ## 3. Technology Stack
-
+ 
 ### Backend
 | Component | Library/Version |
 |-----------|----------------|
 | Runtime | Node.js 22+ |
 | Framework | Express 4.x |
-| Database | Supabase PostgreSQL (pg) |
+| Database | Supabase PostgreSQL (`pg`, `@supabase/server`) |
 | Real-time | Socket.IO 4.7.5 |
 | Auth | express-session + bcryptjs |
 | Email | nodemailer (Gmail SMTP) |
 | Network | ping, net-snmp, child_process |
-
+ 
 ### Frontend
 | Component | Library/Version |
 |-----------|----------------|
@@ -70,11 +69,11 @@ Target environment: IC Building network — DNSC (De La Salle University – Das
 | Real-time | Socket.IO Client 4.7.5 |
 | Icons | Font Awesome 6.5.1 |
 | Fonts | Google Fonts (IBM Plex Sans, Sora) |
-
+ 
 ---
-
+ 
 ## 4. Folder Structure
-
+ 
 ```
 smartCampus/
 ├── .env                        # Environment configuration (never commit)
@@ -83,6 +82,8 @@ smartCampus/
 ├── README.md
 ├── server/
 │   ├── server.js              # Main Express server (API, scanning, Socket.IO)
+│   ├── supabase.js            # Supabase client helpers (getSupabaseClients)
+│   ├── MIGRATION.md           # MySQL-to-Supabase migration guide
 │   ├── package.json
 │   └── package-lock.json
 ├── html/                       # Frontend HTML pages
@@ -109,83 +110,70 @@ smartCampus/
 │   └── sidebar.html           # Reusable navigation sidebar
 └── images/                     # Logos and floor plan images
 ```
-
+ 
 ---
-
+ 
 ## 5. Prerequisites
-
+ 
 | Requirement | Version | Notes |
 |-------------|---------|-------|
-| Node.js | 22+ | [nodejs.org](https://nodejs.org) |
+| Node.js | 22+ | [nodejs.org](https://nodejs.org). Required by `@supabase/server` |
 | npm | 9+ | Bundled with Node.js |
-| Supabase | PostgreSQL | Session-pooler connection required; MySQL needed only to import old data |
+| Supabase project | — | PostgreSQL with a **session-pooler** connection string |
 | Git | Any | |
-| OS | Windows 10/11 or Linux | ARP/gateway detection uses `ipconfig` on Windows, `ip route` on Linux |
-
-> **Windows users**: The server uses `ipconfig` and `arp -a` to detect the gateway and connected devices. Run the server on the same machine connected to the campus network.
-
+| MySQL | Optional | Only needed to import data from the old MySQL version |
+| OS | Windows 10/11 or Linux | Gateway detection uses `ipconfig` on Windows, `ip route` on Linux |
+ 
+> **Windows users**: The server uses `ipconfig` and `arp -a` to detect the gateway and connected devices. Run the server on a machine connected to the campus network.
+ 
 ---
-
+ 
 ## 6. Installation
-
+ 
 ```bash
 # 1. Clone the repository
 git clone <repository-url>
 cd smartCampus
-
+ 
 # 2. Install backend dependencies
 cd server
 npm install
 cd ..
 ```
-
+ 
 ---
-
+ 
 ## 7. Environment Configuration
-
-### Supabase connection
-
-The backend stores application data in Supabase PostgreSQL. Node.js 22 or newer is required for `@supabase/server`.
-
-Set these variables in the root `.env` (never commit actual keys):
-
+ 
+Create a `.env` file in the project root (copy the template below). **Never commit this file or any real keys.**
+ 
+> **Load order:** variables supplied by the host take priority, then `server/.env`, then the root `.env`. Define Supabase credentials in only one of the two files to avoid confusion.
+ 
 ```env
+# ── Supabase ───────────────────────────────────────────
 SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
 SUPABASE_SECRET_KEY=sb_secret_...
 SUPABASE_JWKS_URL=https://your-project.supabase.co/auth/v1/.well-known/jwks.json
-```
-
-Environment variables supplied by the host take priority, followed by `server/.env`, then the root `.env`. Avoid defining Supabase credentials in both files.
-
-Run `npm install` in `server/`, then `npm run check:supabase` to verify both keys, the database API, and JWKS without modifying data. Restart the backend after changing credentials.
-
-Backend code can use `getSupabaseClients()` from `server/supabase.js`; clients are also available as `app.locals.supabase` and `app.locals.supabaseAdmin`. The admin client bypasses RLS and must only be used in authorized backend operations. Never send it or its key to the browser.
-
-Set `SUPABASE_DB_URL` to your PostgreSQL session-pooler connection string and follow [the migration guide](server/MIGRATION.md) before starting the backend. API keys alone are insufficient for database migrations.
-
-Create a `.env` file in the `server/` directory (copy the template below). **Never commit this file.**
-
-```env
-# ── Database ───────────────────────────────────────────
-DB_HOST=localhost
-DB_PORT=3306
-DB_USER=root
-DB_PASSWORD=your_mysql_root_password
-DB_NAME=smartcampus
-
+ 
+# Session-pooler connection string (includes the database password).
+# Required for migrations; API keys alone are not enough.
+SUPABASE_DB_URL=postgresql://postgres.your-project:your_db_password@aws-0-region.pooler.supabase.com:5432/postgres
+# Optional: only if TLS verification fails
+# SUPABASE_DB_CA_FILE=/path/to/supabase-ca.crt
+ 
 # ── Session ────────────────────────────────────────────
 # Generate with: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 SESSION_SECRET=replace_with_64_char_random_hex_string
 SESSION_MAX_AGE_MS=28800000
 SESSION_COOKIE_SECURE=false       # Set to true when running behind HTTPS
-
+ 
 # ── Network Scanning ───────────────────────────────────
 SNMP_ENABLED=false
 ROUTER_IP=192.168.254.254         # Your campus gateway IP
 NETWORK_CIDR=                     # Optional: auto-detected if left blank
 BLACKLISTED_IPS=                  # Comma-separated IPs to exclude from scan
-
+ 
 # ── Email Alerts ───────────────────────────────────────
 ALERT_EMAIL_ENABLED=true
 SMTP_HOST=smtp.gmail.com
@@ -195,122 +183,144 @@ SMTP_USER=your_sender@gmail.com
 SMTP_PASS=your_gmail_app_password  # Google App Password (not your login password)
 ALERT_EMAIL_FROM=SmartCampus SecureNet
 ALERT_EMAIL_TO=it_team@yourinstitution.edu
-
+ 
 # ── CORS (production) ──────────────────────────────────
 ALLOWED_ORIGINS=http://localhost:3000
 ```
-
+ 
+### Verify the Supabase connection
+ 
+From `server/`:
+ 
+```bash
+npm run check:supabase
+```
+ 
+This checks both API keys, the database API, and JWKS without modifying any data. Restart the backend after changing credentials.
+ 
+> Backend code can call `getSupabaseClients()` from `server/supabase.js`; the clients are also available as `app.locals.supabase` and `app.locals.supabaseAdmin`. The admin client **bypasses RLS** and must only be used in authorized backend operations. Never send it, or its key, to the browser.
+ 
 ### Generating a Gmail App Password
-
+ 
 1. Go to [Google Account](https://myaccount.google.com) → Security → 2-Step Verification (must be enabled)
 2. Search for "App Passwords"
 3. Create a new app password for "Mail"
 4. Paste the 16-character password into `SMTP_PASS`
-
 ---
-
+ 
 ## 8. Database Setup
-
-Follow [the MySQL-to-Supabase migration guide](server/MIGRATION.md) for connection settings and data transfer.
-
-From the `server/` directory:
-
+ 
+The application uses Supabase PostgreSQL. See [the migration guide](server/MIGRATION.md) for full connection and data-transfer details.
+ 
+From the `server/` directory, create the schema (seven application tables):
+ 
 ```bash
 npm run db:migrate
-# For existing MySQL records, after setting MYSQL_DATETIME_OFFSET:
-npm run db:import:mysql
-npm start
 ```
-
-The schema migration creates the seven application tables. The importer preserves existing accounts, password hashes, device IDs, logs, and alerts. It refuses to overwrite populated target tables. Existing MySQL data is left intact.
-
+ 
+### Optional: import data from the old MySQL database
+ 
+Only needed if you have existing MySQL records. Add the old connection settings to `.env` (used **only** by the import script):
+ 
+```env
+DB_HOST=localhost
+DB_PORT=3306
+DB_USER=root
+DB_PASSWORD=your_mysql_root_password
+DB_NAME=smartcampus
+MYSQL_DATETIME_OFFSET=...   # see server/MIGRATION.md
+```
+ 
+Then run:
+ 
+```bash
+npm run db:import:mysql
+```
+ 
+The importer preserves existing accounts, password hashes, device IDs, logs, and alerts. It refuses to overwrite populated target tables, and the MySQL data is left intact.
+ 
 ---
-
+ 
 ## 9. Running the Project
-
+ 
 ### Start the Backend Server
-
+ 
 ```bash
 cd server
-node server.js
+npm start
 ```
-
+ 
 The server starts on **http://localhost:4000** and prints a startup message including the detected gateway IP and CIDR.
-
+ 
 ### Serve the Frontend
-
-The frontend is static HTML. Open pages directly in a browser or use a local static server:
-
+ 
+The frontend is static HTML. Use a local static server from the project root:
+ 
 ```bash
-# From the project root
 npx serve .
 ```
-
+ 
 Then navigate to: **http://localhost:3000/html/login.html**
-
-> Alternatively, open `html/login.html` directly in a browser (file://) — API calls will still reach the backend at localhost:4000.
-
+ 
+> Opening `html/login.html` directly via `file://` is not recommended: the browser sends a `null` origin, which will be blocked by the backend's CORS rules.
+ 
 ---
-
+ 
 ## 10. First-Time Setup
-
-1. Start the backend server (step 9 above).
+ 
+1. Complete [Database Setup](#8-database-setup) and start the backend (step 9).
 2. Register an account at `html/signup.html`.
 3. For a fresh database, elevate your first account in the Supabase SQL editor:
-   ```sql
+```sql
    UPDATE public."USERS" SET "Role" = 'Admin' WHERE "Email" = 'your@email.com';
-   ```
+```
 4. Log in at `html/login.html`.
 5. Navigate to **Settings** to configure:
    - Enable/disable automated scanning
    - Adjust scan interval
    - Toggle email alerts
-
 ---
-
+ 
 ## 11. Usage Guide
-
+ 
 ### Dashboard (`index.html`)
 Shows total devices, online count, average latency, active alerts, a latency trend chart, and a live ping feed updated every 2 seconds.
-
+ 
 ### Devices (`devices.html`)
 Lists all discovered devices. Click any row to open a detail modal where you can:
 - View IP, MAC, status, latency, location
 - Edit device name, type, building, floor, room
 - Ping the device on demand
 - Delete the device (Admin only)
-
 ### Topology (`topology.html`)
 Three view modes:
 - **Graph** — Force-directed Vis-Network diagram
 - **Floor Map** — Drag-and-drop device placement on floor plan images
 - **Hierarchy** — Tree view grouped by floor
-
 ### Alerts (`alerts.html`)
 Shows the last 100 alerts with severity (danger / warning / success). Mark alerts as resolved. Export to CSV.
-
+ 
 ### Reports (`reports.html`)
 Four analytics panels with 24h / 7d / 30d time selectors:
 - Overview stats
 - Latency trend chart
 - Per-device uptime %
 - Alert summary by type
-
 ### Settings (`settings.html`) — Admin only
 Toggle scanning on/off, set scan interval, configure email alerts at runtime.
-
+ 
 ### Users (`users.html`) — Admin only
 Create, delete, and change roles of user accounts.
-
+ 
 ### Activity Log (`activity.html`) — Admin only
 Paginated audit log of all user actions and system events.
-
+ 
 ---
-
+ 
 ## 12. API Reference
-
+ 
 All endpoints are served at `http://localhost:4000`.
-
+ 
 ### Authentication
 | Method | Path | Description |
 |--------|------|-------------|
@@ -319,7 +329,7 @@ All endpoints are served at `http://localhost:4000`.
 | POST | `/api/auth/logout` | Log out |
 | GET | `/api/auth/me` | Get current session user |
 | PUT | `/api/auth/profile` | Update profile (name, contact) |
-
+ 
 ### Devices
 | Method | Path | Description |
 |--------|------|-------------|
@@ -327,25 +337,25 @@ All endpoints are served at `http://localhost:4000`.
 | DELETE | `/api/devices/:id` | Delete device (Admin) |
 | PUT | `/api/devices/:id/location` | Update device metadata |
 | GET | `/api/devices/:id/ping` | Live ping specific device |
-
+ 
 ### Monitoring
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/api/monitor/router` | On-demand router scan |
 | POST | `/api/monitor/discover` | Trigger network discovery |
 | GET | `/api/ping?target=IP` | Ping arbitrary IP |
-
+ 
 ### Topology
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/api/topology` | Network topology (devices + links) |
-
+ 
 ### Alerts
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/api/alerts` | Last 100 alerts |
 | PUT | `/api/alerts/:id/resolve` | Resolve alert |
-
+ 
 ### Analytics
 | Method | Path | Description |
 |--------|------|-------------|
@@ -353,7 +363,7 @@ All endpoints are served at `http://localhost:4000`.
 | GET | `/api/analytics/latency-trend?period=7d` | Latency time series |
 | GET | `/api/analytics/device-uptime?period=30d` | Per-device uptime % |
 | GET | `/api/analytics/alerts-summary?period=24h` | Alert breakdown |
-
+ 
 ### Settings (Admin)
 | Method | Path | Description |
 |--------|------|-------------|
@@ -361,19 +371,19 @@ All endpoints are served at `http://localhost:4000`.
 | PUT | `/api/settings/scanning` | Toggle scanning |
 | GET | `/api/settings/email-alerts` | Email alert config |
 | POST | `/api/settings/email-alerts` | Update email alerts |
-
+ 
 ### Users (Admin)
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/api/users` | List all users |
 | PUT | `/api/users/:id/role` | Change user role |
 | DELETE | `/api/users/:id` | Delete user |
-
+ 
 ### Audit
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/api/activity-logs` | Paginated audit logs (Admin) |
-
+ 
 ### Real-Time (Socket.IO)
 | Event | Direction | Description |
 |-------|-----------|-------------|
@@ -381,82 +391,78 @@ All endpoints are served at `http://localhost:4000`.
 | `devices:update` | Server → Client | Device list changed |
 | `devices:ping_stream` | Server → Client | Live latency data (2s) |
 | `alert:new` | Server → Client | New alert generated |
-
+ 
 ---
-
+ 
 ## 13. Troubleshooting
-
+ 
 ### Server fails to connect to Supabase
-- Set `SUPABASE_DB_URL` to the session-pooler connection string with the database password.
+- Set `SUPABASE_DB_URL` to the **session-pooler** connection string, with the database password filled in.
+- Run `npm run check:supabase` in `server/` to test the API keys and JWKS.
 - Run `npm run db:migrate` in `server/` before starting the backend.
 - If TLS verification fails, set `SUPABASE_DB_CA_FILE` to the project's downloaded CA certificate.
+- Restart the backend after changing any credentials.
 - MySQL `DB_*` settings are used only by the import script.
-
 ### Gateway not detected / no devices discovered
 - Confirm `ROUTER_IP` in `.env` matches your actual gateway (check with `ipconfig` on Windows)
 - Run the server as Administrator on Windows (ICMP ping may require elevated privileges)
 - Set `NETWORK_CIDR` explicitly if auto-detection fails (e.g., `192.168.1.0/24`)
-
 ### Email alerts not sending
 - Verify `SMTP_USER` and `SMTP_PASS` are correct (use a Gmail App Password, not your login password)
 - Check that 2-Step Verification is enabled on the Gmail account
 - Set `ALERT_EMAIL_ENABLED=true` in `.env`
 - Toggle email alerts from the Settings page after login
-
-### `CORS` errors in browser console
+### CORS errors in browser console
 - The backend must be running on port 4000
 - Set `ALLOWED_ORIGINS` in `.env` to the URL serving your frontend
-- Do not open HTML files via a different port without updating `ALLOWED_ORIGINS`
-
+- Do not open HTML files via a different port or `file://` without updating `ALLOWED_ORIGINS`
 ### Real-time updates not working
 - Confirm Socket.IO client version matches server (both 4.7.5)
 - Check browser console for WebSocket errors
 - Ensure no firewall is blocking port 4000
-
 ---
-
+ 
 ## 14. Deployment
-
+ 
 ### Backend (any VPS / server)
-
+ 
 ```bash
 # Install PM2 for process management
 npm install -g pm2
-
+ 
 cd smartCampus/server
 pm2 start server.js --name smartcampus-backend
 pm2 save
 pm2 startup
 ```
-
-Set `SESSION_COOKIE_SECURE=true` and run behind an HTTPS reverse proxy (nginx/Caddy).
-
+ 
+Set `SESSION_COOKIE_SECURE=true` and run behind an HTTPS reverse proxy (nginx/Caddy). Provide all `.env` values (including the `SUPABASE_*` variables) through the host environment or the server's `.env`.
+ 
+> Network discovery relies on the host being on the campus network, so a generic cloud VPS will not discover campus devices. Deploy the backend on a machine inside the IC Building network.
+ 
 ### Frontend (Vercel)
-
+ 
 The `vercel.json` at the project root rewrites all routes to `html/index.html`. Deploy the project root to Vercel:
-
+ 
 ```bash
 npm install -g vercel
 vercel --prod
 ```
-
+ 
 Update `ALLOWED_ORIGINS` in the backend `.env` to the deployed Vercel domain.
-
+ 
 ---
-
+ 
 ## 15. Security Notes
-
+ 
 > The following must be addressed before any public or production deployment:
-
+ 
 1. **Never commit `.env`** — The `.gitignore` excludes it; verify it was never accidentally committed with `git log --all --full-history -- .env`.
-2. **Rotate credentials** if the `.env` was ever committed — revoke and regenerate your Gmail App Password and choose a new `SESSION_SECRET`.
-3. **Use HTTPS** in production — set `SESSION_COOKIE_SECURE=true` and enforce HTTPS at the reverse proxy level.
-4. **Restrict CORS** — set `ALLOWED_ORIGINS` to only your frontend domain, not a wildcard.
-5. **Rate limiting** — `express-rate-limit` is applied to `/api/auth/login` (5 attempts / 15 min). Do not remove it.
-
+2. **Rotate credentials** if `.env` was ever committed — regenerate the Supabase secret key and database password, revoke and regenerate your Gmail App Password, and choose a new `SESSION_SECRET`.
+3. **Keep the Supabase secret key server-side** — `SUPABASE_SECRET_KEY` and the admin client bypass RLS. Never expose them to the browser or the frontend code.
+4. **Use HTTPS** in production — set `SESSION_COOKIE_SECURE=true` and enforce HTTPS at the reverse proxy level.
+5. **Restrict CORS** — set `ALLOWED_ORIGINS` to only your frontend domain, not a wildcard.
+6. **Rate limiting** — `express-rate-limit` is applied to `/api/auth/login` (5 attempts / 15 min). Do not remove it.
 ---
-
+ 
 *SmartCampus SecureNet — Capstone Project, DNSC IC Building*
-#   S M A R T C A M P U S  
- #   S M A R T C A M P U S  
- 
