@@ -121,18 +121,29 @@ function populateDevicesTable() {
     if (!tbody) return;
 
     let rows = devicesData;
+    const _periodCutoff = (days) => { const d = new Date(); d.setDate(d.getDate() - days); d.setHours(0,0,0,0); return d; };
     if (deviceTableFilter === 'today') {
         const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
         const filtered = devicesData.filter(d => d.lastSeenRaw && new Date(d.lastSeenRaw) >= todayStart);
+        rows = filtered.length > 0 ? filtered : devicesData;
+    } else if (deviceTableFilter === '7d') {
+        const cutoff = _periodCutoff(7);
+        const filtered = devicesData.filter(d => d.lastSeenRaw && new Date(d.lastSeenRaw) >= cutoff);
+        rows = filtered.length > 0 ? filtered : devicesData;
+    } else if (deviceTableFilter === '30d') {
+        const cutoff = _periodCutoff(30);
+        const filtered = devicesData.filter(d => d.lastSeenRaw && new Date(d.lastSeenRaw) >= cutoff);
         rows = filtered.length > 0 ? filtered : devicesData;
     }
 
     // update visible count label
     const countEl = document.getElementById('dv-table-count');
     if (countEl) {
-        countEl.textContent = deviceTableFilter === 'today'
-            ? `${rows.length} detected today`
-            : `${rows.length} total`;
+        const label = deviceTableFilter === 'today' ? 'detected today'
+            : deviceTableFilter === '7d'  ? 'seen in last 7 days'
+            : deviceTableFilter === '30d' ? 'seen in last 30 days'
+            : 'total';
+        countEl.textContent = `${rows.length} ${label}`;
     }
 
     const displayRows = deviceTableExpanded ? rows : rows.slice(0, DEVICE_TABLE_PAGE);
@@ -3119,25 +3130,23 @@ window.addEventListener('load', async function () {
         });
     }
 
-    // Device table Today / All toggle
-    const filterToday = document.getElementById('dv-filter-today');
-    const filterAll   = document.getElementById('dv-filter-all');
-    if (filterToday && filterAll) {
-        filterToday.addEventListener('click', () => {
-            deviceTableFilter = 'today';
+    // Device table period filter buttons
+    const _filterBtns = {
+        'dv-filter-today': 'today',
+        'dv-filter-7d':    '7d',
+        'dv-filter-30d':   '30d',
+        'dv-filter-all':   'all',
+    };
+    const _allFilterEls = Object.keys(_filterBtns).map(id => document.getElementById(id)).filter(Boolean);
+    _allFilterEls.forEach(btn => {
+        btn.addEventListener('click', () => {
+            deviceTableFilter = _filterBtns[btn.id];
             deviceTableExpanded = false;
-            filterToday.classList.add('active');
-            filterAll.classList.remove('active');
+            _allFilterEls.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
             populateDevicesTable();
         });
-        filterAll.addEventListener('click', () => {
-            deviceTableFilter = 'all';
-            deviceTableExpanded = false;
-            filterAll.classList.add('active');
-            filterToday.classList.remove('active');
-            populateDevicesTable();
-        });
-    }
+    });
 
     // Device table Show All / Show Less toggle
     const dvToggleBtn = document.getElementById('dv-table-toggle-btn');
