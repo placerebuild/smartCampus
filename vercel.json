@@ -26,6 +26,7 @@
     { "source": "/signup.html", "destination": "/html/signup.html" },
     { "source": "/mainpage.html", "destination": "/html/mainpage.html" },
     { "source": "/users.html", "destination": "/html/users.html" },
-    { "source": "/activity.html", "destination": "/html/activity.html" }
+    { "source": "/activity.html", "destination": "/html/activity.html" },
+    { "source": "/management.html", "destination": "/html/management.html" }
   ]
 }
