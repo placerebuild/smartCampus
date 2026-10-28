@@ -1065,6 +1065,19 @@ async function emitDevicesUpdate() {
   }
 }
 
+// Emit an alert to Socket.IO clients AND via Supabase Broadcast so Vercel dashboards
+// receive notifications without a direct Socket.IO connection.
+function emitAlertEvent(alertPayload) {
+  io.emit('alert:new', alertPayload);
+  if (_supabaseBroadcastChannel) {
+    _supabaseBroadcastChannel.send({
+      type: 'broadcast',
+      event: 'alert:new',
+      payload: alertPayload,
+    }).catch(() => {});
+  }
+}
+
 // Map frontend severity tokens to the DB enum values used by the ALERT table
 function mapSeverityToDb(severity) {
   if (severity === 'danger')  return 'High';
@@ -1677,7 +1690,7 @@ async function runContinuousPingSweep() {
             if (highLatencyCount === LATENCY_WARN_PINGS && latencyAlertStage < 1) {
               latencyAlertStage = 1;
               const warnLatMsg = `Sustained high latency (${latency} ms) on ${device.DeviceName || target} — persisting for ~10 seconds.`;
-              io.emit('alert:new', {
+              emitAlertEvent({
                 type: 'abnormal', severity: 'warning', stage: 'warn',
                 message: warnLatMsg, deviceId: device.DeviceID,
                 deviceName: device.DeviceName || target, time: new Date().toISOString()
@@ -1691,7 +1704,7 @@ async function runContinuousPingSweep() {
               const critLatMsg = latency >= LATENCY_CRIT_MS
                 ? `Critical latency (${latency} ms) on ${device.DeviceName || target} — exceeds acceptable threshold.`
                 : `Prolonged high latency on ${device.DeviceName || target} (${latency} ms) — degraded for ~1 minute.`;
-              io.emit('alert:new', {
+              emitAlertEvent({
                 type: 'abnormal', severity: 'danger', stage: 'critical',
                 message: critLatMsg, deviceId: device.DeviceID,
                 deviceName: device.DeviceName || target, time: new Date().toISOString()
@@ -1724,7 +1737,7 @@ async function runContinuousPingSweep() {
                   : ` (offline for ${offlineSec}s)`)
               : '';
             const recoveryMsg = `Device ${device.DeviceName || target} is back online${durationStr}.`;
-            io.emit('alert:new', {
+            emitAlertEvent({
               type: 'recovery', severity: 'success', stage: 'resolved',
               message: recoveryMsg, deviceId: device.DeviceID,
               deviceName: device.DeviceName || target, time: new Date().toISOString()
@@ -1753,7 +1766,7 @@ async function runContinuousPingSweep() {
         if (alertStage === 1 && failCount >= OFFLINE_WARN) {
           alertStage = 2;
           const warnMsg = `Device ${device.DeviceName || target} has been offline for ~30 seconds.`;
-          io.emit('alert:new', {
+          emitAlertEvent({
             type: 'downtime', severity: 'warning', stage: 'warn',
             message: warnMsg, deviceId: device.DeviceID,
             deviceName: device.DeviceName || target, time: new Date().toISOString()
@@ -1785,7 +1798,7 @@ async function runContinuousPingSweep() {
               console.error('Impact assessment error:', err);
             }
 
-            io.emit('alert:new', {
+            emitAlertEvent({
               type: 'downtime', severity: 'danger', stage: 'critical',
               message: critMsg, deviceId: device.DeviceID,
               deviceName: device.DeviceName || target, time: new Date().toISOString()

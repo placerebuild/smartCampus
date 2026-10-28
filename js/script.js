@@ -2886,6 +2886,82 @@ function applyPingStreamResults(results) {
     }
 }
 
+function showAlertToast(alert) {
+    let toastContainer = document.getElementById('alertToastContainer');
+    if (!toastContainer) {
+        toastContainer = document.createElement('div');
+        toastContainer.id = 'alertToastContainer';
+        toastContainer.className = 'toast-container position-fixed bottom-0 end-0 p-3';
+        toastContainer.style.zIndex = '1055';
+        document.body.appendChild(toastContainer);
+    }
+
+    const toastId = 'toast-' + Date.now();
+    const icon = alert.severity === 'danger' ? 'fa-exclamation-triangle' : (alert.severity === 'warning' ? 'fa-exclamation-circle' : 'fa-check-circle');
+    const severityLabel = alert.severity === 'danger' ? 'Critical' : alert.severity === 'warning' ? 'Warning' : 'Recovery';
+    const toastHtml = `
+        <div id="${toastId}" class="toast border-0 shadow-lg" role="alert" aria-live="assertive" aria-atomic="true" style="min-width:300px;max-width:380px;">
+            <div class="toast-header text-bg-${alert.severity} border-0 rounded-top">
+                <i class="fas ${icon} me-2"></i>
+                <strong class="me-auto">${severityLabel} Alert</strong>
+                <small class="opacity-75">${new Date(alert.time || Date.now()).toLocaleTimeString()}</small>
+                <button type="button" class="btn-close btn-close-white ms-2" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+            <div class="toast-body fw-semibold" style="font-size:0.9rem;">
+                ${alert.message || 'Alert triggered.'}
+                ${alert.deviceName ? `<div class="text-muted small mt-1"><i class="fas fa-server me-1"></i>${alert.deviceName}</div>` : ''}
+            </div>
+        </div>
+    `;
+    toastContainer.insertAdjacentHTML('beforeend', toastHtml);
+
+    const existingToasts = toastContainer.querySelectorAll('.toast');
+    if (existingToasts.length > 4) existingToasts[0].remove();
+
+    const toastEl = document.getElementById(toastId);
+    if (typeof bootstrap !== 'undefined') {
+        const bsToast = new bootstrap.Toast(toastEl, { autohide: true, delay: 8000 });
+        bsToast.show();
+        toastEl.addEventListener('hidden.bs.toast', () => toastEl.remove());
+    }
+
+    // Add to "Recent Alerts" feed on dashboard
+    const recentAlerts = document.getElementById('recent-alerts');
+    if (recentAlerts) {
+        const timeStr = new Date(alert.time).toLocaleTimeString();
+        const alertHtml = `
+            <li class="list-group-item px-0 py-3">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div class="ms-2 me-auto">
+                        <div class="fw-bold mb-1">${alert.message}</div>
+                        <span class="badge bg-${alert.severity} me-1">${alert.type.toUpperCase()}</span>
+                        <small class="text-muted"><i class="far fa-clock me-1"></i>${timeStr}</small>
+                    </div>
+                </div>
+            </li>
+        `;
+        recentAlerts.insertAdjacentHTML('afterbegin', alertHtml);
+        while (recentAlerts.children.length > 10) recentAlerts.lastElementChild.remove();
+    }
+
+    // Prepend live row to the Alerts page table if it's open
+    const alertTbody = document.querySelector('#alerts-table tbody');
+    if (alertTbody) {
+        const label = alert.severity === 'danger' ? 'High' : alert.severity === 'warning' ? 'Warning' : 'Info';
+        const badgeClass = alert.severity === 'danger' ? 'danger' : alert.severity === 'warning' ? 'warning' : 'success';
+        alertTbody.insertAdjacentHTML('afterbegin', `<tr>
+            <td>${new Date(alert.time).toLocaleString()}</td>
+            <td>${alert.deviceName || 'Unknown'}</td>
+            <td>${alert.message}</td>
+            <td><span class="badge bg-${badgeClass}">${label}</span></td>
+        </tr>`);
+    }
+
+    alertsData.unshift({ id: alert.id, time: alert.time, severity: alert.severity, resolved: false });
+    updateAlertBadge();
+    if (typeof updateStatCards === 'function') updateStatCards();
+}
+
 function initDashboardRealtime() {
     if (!window.SMARTCAMPUS_CLOUD && typeof io === 'function') {
         const dashboardSocket = io(getTopologyApiBase(), {
@@ -2905,93 +2981,7 @@ function initDashboardRealtime() {
             }
         });
 
-        dashboardSocket.on('alert:new', (alert) => {
-            // Show toast notification
-            let toastContainer = document.getElementById('alertToastContainer');
-            if (!toastContainer) {
-                toastContainer = document.createElement('div');
-                toastContainer.id = 'alertToastContainer';
-                toastContainer.className = 'toast-container position-fixed bottom-0 end-0 p-3';
-                toastContainer.style.zIndex = '1055';
-                document.body.appendChild(toastContainer);
-            }
-
-            const toastId = 'toast-' + Date.now();
-            const icon = alert.severity === 'danger' ? 'fa-exclamation-triangle' : (alert.severity === 'warning' ? 'fa-exclamation-circle' : 'fa-check-circle');
-            const severityLabel = alert.severity === 'danger' ? 'Critical' : alert.severity === 'warning' ? 'Warning' : 'Recovery';
-            const toastHtml = `
-                <div id="${toastId}" class="toast border-0 shadow-lg" role="alert" aria-live="assertive" aria-atomic="true" style="min-width:300px;max-width:380px;">
-                    <div class="toast-header text-bg-${alert.severity} border-0 rounded-top">
-                        <i class="fas ${icon} me-2"></i>
-                        <strong class="me-auto">${severityLabel} Alert</strong>
-                        <small class="opacity-75">${new Date(alert.time || Date.now()).toLocaleTimeString()}</small>
-                        <button type="button" class="btn-close btn-close-white ms-2" data-bs-dismiss="toast" aria-label="Close"></button>
-                    </div>
-                    <div class="toast-body fw-semibold" style="font-size:0.9rem;">
-                        ${alert.message || 'Alert triggered.'}
-                        ${alert.deviceName ? `<div class="text-muted small mt-1"><i class="fas fa-server me-1"></i>${alert.deviceName}</div>` : ''}
-                    </div>
-                </div>
-            `;
-            toastContainer.insertAdjacentHTML('beforeend', toastHtml);
-            
-            // Enforce maximum of 4 alerts by removing the oldest one
-            const existingToasts = toastContainer.querySelectorAll('.toast');
-            if (existingToasts.length > 4) {
-                existingToasts[0].remove();
-            }
-            
-            const toastEl = document.getElementById(toastId);
-
-            if (typeof bootstrap !== 'undefined') {
-                const bsToast = new bootstrap.Toast(toastEl, {
-                    autohide: true,
-                    delay: 8000
-                });
-                bsToast.show();
-                toastEl.addEventListener('hidden.bs.toast', () => toastEl.remove());
-            }
-
-            // Add to "Recent Alerts" feed on dashboard
-            const recentAlerts = document.getElementById('recent-alerts');
-            if (recentAlerts) {
-                const timeStr = new Date(alert.time).toLocaleTimeString();
-                const alertHtml = `
-                    <li class="list-group-item px-0 py-3">
-                        <div class="d-flex justify-content-between align-items-start">
-                            <div class="ms-2 me-auto">
-                                <div class="fw-bold mb-1">${alert.message}</div>
-                                <span class="badge bg-${alert.severity} me-1">${alert.type.toUpperCase()}</span>
-                                <small class="text-muted"><i class="far fa-clock me-1"></i>${timeStr}</small>
-                            </div>
-                        </div>
-                    </li>
-                `;
-                recentAlerts.insertAdjacentHTML('afterbegin', alertHtml);
-                // Keep only the 10 most recent
-                while (recentAlerts.children.length > 10) {
-                    recentAlerts.lastElementChild.remove();
-                }
-            }
-
-            // Prepend live row to the Alerts page table if it's open
-            const alertTbody = document.querySelector('#alerts-table tbody');
-            if (alertTbody) {
-                const label = alert.severity === 'danger' ? 'High' : alert.severity === 'warning' ? 'Warning' : 'Info';
-                const badgeClass = alert.severity === 'danger' ? 'danger' : alert.severity === 'warning' ? 'warning' : 'success';
-                alertTbody.insertAdjacentHTML('afterbegin', `<tr>
-                    <td>${new Date(alert.time).toLocaleString()}</td>
-                    <td>${alert.deviceName || 'Unknown'}</td>
-                    <td>${alert.message}</td>
-                    <td><span class="badge bg-${badgeClass}">${label}</span></td>
-                </tr>`);
-            }
-
-            // Keep alertsData in sync so badge + Alerts Today counter stay accurate
-            alertsData.unshift({ id: alert.id, time: alert.time, severity: alert.severity, resolved: false });
-            updateAlertBadge();
-            if (typeof updateStatCards === 'function') updateStatCards();
-        });
+        dashboardSocket.on('alert:new', showAlertToast);
     }
 
     // Cloud mode: subscribe to Supabase Broadcast for the live ping stream.
@@ -3008,6 +2998,9 @@ function initDashboardRealtime() {
                     if (payload && Array.isArray(payload.devices)) {
                         applyPingStreamResults(payload.devices);
                     }
+                })
+                .on('broadcast', { event: 'alert:new' }, ({ payload }) => {
+                    if (payload) showAlertToast(payload);
                 })
                 .subscribe();
             window.__scRealtimeConnected = true;
