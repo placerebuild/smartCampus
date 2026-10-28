@@ -60,7 +60,7 @@
         </div>
 
         <!-- Stat cards -->
-        <div class="row g-2 mb-2">
+        <div class="row g-2 mb-2 dash-stat-row">
             <div class="col-6 col-md-3">
                 <div class="card p-2 stat-card">
                     <div class="d-flex justify-content-between align-items-center">
@@ -104,7 +104,7 @@
         </div>
 
         <!-- Main panel row: Left (chart) | Center (ICMP) | Right (Alerts) -->
-        <div class="row g-2 align-items-stretch mb-2">
+        <div class="row g-2 align-items-stretch mb-2 dash-main-row">
 
             <!-- LEFT: Total Devices donut chart -->
             <div class="col-12 col-lg-4">
@@ -118,7 +118,7 @@
 
             <!-- CENTER: ICMP Results -->
             <div class="col-12 col-lg-5">
-                <div class="card p-2 panel-card h-100">
+                <div class="card p-2 panel-card h-100 d-flex flex-column">
                     <div class="d-flex justify-content-between align-items-center mb-1">
                         <div class="section-title mb-0" style="font-size:0.78rem;"><i class="fas fa-satellite-dish me-1 text-info"></i>ICMP Result</div>
                         <div class="d-flex align-items-center gap-2">
@@ -127,7 +127,7 @@
                         </div>
                     </div>
                     <p class="text-muted mb-1" style="font-size:0.68rem;">Live ICMP echo — reachability and round-trip latency per device.</p>
-                    <div style="overflow-y:auto;flex:1;">
+                    <div style="overflow-y:auto;flex:1;min-height:0;">
                         <table class="table table-sm table-hover mb-0" id="icmp-table">
                             <thead class="table-light" style="font-size:0.67rem;position:sticky;top:0;z-index:1;">
                                 <tr><th>Device</th><th>IP Address</th><th>Status</th><th>Latency</th><th>Last Ping</th></tr>
@@ -142,9 +142,9 @@
 
             <!-- RIGHT: Recent Alerts -->
             <div class="col-12 col-lg-3">
-                <div class="card p-2 panel-card h-100">
-                    <div class="section-title mb-1" style="font-size:0.78rem;">Recent Alerts</div>
-                    <div style="overflow-y:auto;max-height:320px;">
+                <div class="card p-2 panel-card h-100 d-flex flex-column">
+                    <div class="section-title mb-1" style="font-size:0.78rem;flex-shrink:0;">Recent Alerts</div>
+                    <div style="overflow-y:auto;flex:1;min-height:0;">
                         <ul class="list-group list-group-flush" id="recent-alerts"></ul>
                     </div>
                 </div>
@@ -153,7 +153,7 @@
         </div>
 
         <!-- BOTTOM ROW: ARP Table full width -->
-        <div class="row g-2">
+        <div class="row g-2 dash-arp-row">
             <div class="col-12">
                 <div class="card p-2 panel-card">
                     <div class="d-flex justify-content-between align-items-center mb-1">
