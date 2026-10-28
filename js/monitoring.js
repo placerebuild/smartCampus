@@ -156,13 +156,14 @@ function updateUiFromDevices(devices) {
 }
 
 async function refreshAlertsIfPossible() {
+    // Snapshot known IDs before refresh so we can toast only the new arrivals.
+    const knownIds = new Set(
+        (typeof alertsData !== 'undefined' ? alertsData : []).map(a => a.id)
+    );
+
     if (typeof populateAlertsTable === 'function') {
-        // alerts.html — already re-fetches /api/alerts and re-renders the table.
-        populateAlertsTable();
-        return;
-    }
-    if (typeof setAlertsData === 'function' && typeof populateRecentAlerts === 'function') {
-        // Dashboard's "recent alerts" widget — fetch once, then re-render with existing helpers.
+        await populateAlertsTable();
+    } else if (typeof setAlertsData === 'function' && typeof populateRecentAlerts === 'function') {
         try {
             const response = await fetch(`${MONITOR_API_BASE}/api/alerts`, { credentials: 'include' });
             const alerts = await handleApiError(response, 'Alerts request failed.');
@@ -172,6 +173,16 @@ async function refreshAlertsIfPossible() {
             }
         } catch (error) {
             console.warn('Alert refresh failed:', error.message || error);
+        }
+    }
+
+    // Show toast notifications for alerts that just arrived.
+    // API returns {id, type, severity, issue, device, time} — map to showAlertToast shape.
+    if (typeof showAlertToast === 'function' && typeof alertsData !== 'undefined') {
+        for (const a of alertsData) {
+            if (!knownIds.has(a.id)) {
+                showAlertToast({ ...a, message: a.issue, deviceName: a.device });
+            }
         }
     }
 }
@@ -208,6 +219,11 @@ function startRealtimeEvents() {
     realtimeEventSource.addEventListener('alert', () => {
         refreshAlertsIfPossible();
     });
+
+    // Fallback: poll alerts every 30s so notifications still appear during SSE
+    // reconnect gaps (Vercel serverless closes SSE after ~50s; EventSource auto-reconnects
+    // but there is a window where the 'alert' event would be missed).
+    setInterval(refreshAlertsIfPossible, 30000);
 }
 
 function shouldStartMonitoring() {
