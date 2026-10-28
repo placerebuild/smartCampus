@@ -2538,12 +2538,15 @@ let dashboardChartInstance = null;
 function createStatusChart(onlineCount, offlineCount, unknownCount) {
     const canvas = document.getElementById('statusChart');
     if (!canvas) return;
+    canvas.style.width  = '100%';
+    canvas.style.height = '100%';
 
     const total = onlineCount + offlineCount + unknownCount;
 
     if (dashboardChartInstance) {
         dashboardChartInstance.data.datasets[0].data = [onlineCount, offlineCount, unknownCount];
         dashboardChartInstance.options.plugins.title.text = `${total} Total Device${total !== 1 ? 's' : ''}`;
+        dashboardChartInstance.resize(); // re-measure container on every update
         dashboardChartInstance.update();
         return;
     }
@@ -2614,11 +2617,13 @@ function createStatusChart(onlineCount, offlineCount, unknownCount) {
             }
         }
     });
-    // Grid layout height is known only after first paint — resize chart then
-    setTimeout(() => { if (dashboardChartInstance) dashboardChartInstance.resize(); }, 150);
-    window.addEventListener('load', () => {
-        setTimeout(() => { if (dashboardChartInstance) dashboardChartInstance.resize(); }, 50);
-    }, { once: true });
+    // Canvas height is 0 until CSS Grid finishes layout — retry at increasing delays
+    const _cr = () => { if (dashboardChartInstance) dashboardChartInstance.resize(); };
+    [200, 500, 1000].forEach(ms => setTimeout(_cr, ms));
+    if (!window._chartResizeWired) {
+        window._chartResizeWired = true;
+        window.addEventListener('resize', _cr);
+    }
 }
 
 function populateDashboardAlerts(devices) {
