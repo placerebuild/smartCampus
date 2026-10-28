@@ -2614,10 +2614,11 @@ function createStatusChart(onlineCount, offlineCount, unknownCount) {
             }
         }
     });
-    // Flex layouts settle after paint; resize ensures canvas fills its container
-    requestAnimationFrame(() => requestAnimationFrame(() => {
-        if (dashboardChartInstance) dashboardChartInstance.resize();
-    }));
+    // Grid layout height is known only after first paint — resize chart then
+    setTimeout(() => { if (dashboardChartInstance) dashboardChartInstance.resize(); }, 150);
+    window.addEventListener('load', () => {
+        setTimeout(() => { if (dashboardChartInstance) dashboardChartInstance.resize(); }, 50);
+    }, { once: true });
 }
 
 function populateDashboardAlerts(devices) {

@@ -599,44 +599,44 @@ code {
 @media (min-width: 992px) {
     html, body { height: 100%; }
 
+    /*
+     * CSS Grid gives each section an explicit track so nothing overflows:
+     *   track 1 (auto)  — hero banner
+     *   track 2 (auto)  — stat cards
+     *   track 3 (1fr)   — main panels (chart / ICMP / alerts) — fills remaining space
+     *   track 4 (auto)  — ARP table
+     */
     .main-content {
-        height: calc(100vh - 56px); /* 56px = sticky navbar */
+        display: grid;
+        grid-template-rows: auto auto 1fr auto;
+        gap: 0.5rem;
+        height: calc(100vh - 56px);
         overflow: hidden;
-        display: flex;
-        flex-direction: column;
-        gap: 0.5rem;          /* vertical rhythm between sections */
         padding-bottom: 0.5rem;
     }
 
-    /* Bootstrap .row uses margin-top: -gutter to collapse between stacked rows.
-       Inside our flex column those negative margins cause visual overlap — cancel them. */
+    /* Cancel Bootstrap row gutter margins — gap handles vertical rhythm */
     .main-content > .row {
         margin-top: 0 !important;
-        margin-bottom: 0 !important; /* gap handles all vertical spacing */
-    }
-    /* The cols' compensating padding-top also becomes unnecessary */
-    .main-content > .row > * {
-        padding-top: 0;
-    }
-    /* Hero banner uses mb-2; suppress it — gap handles it */
-    .main-content > .hero-panel {
         margin-bottom: 0 !important;
     }
+    .main-content > .row > * { padding-top: 0; }
+    .main-content > .hero-panel { margin-bottom: 0 !important; }
 
-    .hero-panel   { flex-shrink: 0; }
-    .dash-stat-row { flex-shrink: 0; }
-    .dash-arp-row  { flex-shrink: 0; }
-
+    /* Main panels row: the 1fr grid track gives it a real height;
+       cols must be flex columns so cards can stretch inside them */
     .dash-main-row {
-        flex: 1 1 0;
         min-height: 0;
+        align-items: stretch;
     }
-
-    /* each column in the main row must be a flex column too */
     .dash-main-row > [class*="col-"] {
         display: flex;
         flex-direction: column;
+        min-height: 0;
     }
+
+    /* ARP row: auto track — naturally sized, never overflows */
+    .dash-arp-row { min-height: 0; }
 }
 
 /* ICMP & ARP panels */
