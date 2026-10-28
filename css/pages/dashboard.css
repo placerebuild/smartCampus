@@ -595,54 +595,10 @@ code {
 
 
 
-/* ── Viewport-fit: full dashboard in one screen on desktop ── */
-@media (min-width: 992px) {
-    html, body { height: 100%; }
-
-    /*
-     * CSS Grid gives each section an explicit track so nothing overflows:
-     *   track 1 (auto)  — hero banner
-     *   track 2 (auto)  — stat cards
-     *   track 3 (1fr)   — main panels (chart / ICMP / alerts) — fills remaining space
-     *   track 4 (auto)  — ARP table
-     */
-    .main-content {
-        display: grid;
-        grid-template-rows: auto auto 1fr auto;
-        gap: 0.5rem;
-        height: calc(100vh - 56px);
-        overflow: hidden;
-        padding-bottom: 0.5rem;
-    }
-
-    /* Cancel Bootstrap row gutter margins — gap handles vertical rhythm */
-    .main-content > .row {
-        margin-top: 0 !important;
-        margin-bottom: 0 !important;
-    }
-    .main-content > .row > * { padding-top: 0; }
-    .main-content > .hero-panel { margin-bottom: 0 !important; }
-
-    /* Main panels row: 1fr grid track gives it an explicit height.
-       Cols become flex columns; cards use flex:1 (not h-100/height:100%
-       which can fail to resolve against flex-determined parent heights). */
-    .dash-main-row {
-        min-height: 0;
-        align-items: stretch;
-    }
-    .dash-main-row > [class*="col-"] {
-        display: flex;
-        flex-direction: column;
-        min-height: 0;
-    }
-    .dash-main-row > [class*="col-"] > .card {
-        flex: 1;
-        min-height: 0;
-    }
-
-    /* ARP row: auto track — naturally sized, never overflows */
-    .dash-arp-row { min-height: 0; }
-}
+/* ── Dashboard panel heights ── */
+.dash-chart-wrap   { height: 280px; position: relative; }
+.dash-panel-scroll { overflow-y: auto; max-height: 320px; }
+.dash-arp-scroll   { overflow-y: auto; max-height: 130px; }
 
 /* ICMP & ARP panels */
 #icmp-table thead th,

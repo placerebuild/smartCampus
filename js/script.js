@@ -2615,14 +2615,11 @@ function createStatusChart(onlineCount, offlineCount, unknownCount) {
             }
         }
     });
-    // ResizeObserver fires the moment the wrapper gets a real height from CSS Grid
     if (!window._chartResizeWired) {
         window._chartResizeWired = true;
-        const _cr = () => { if (dashboardChartInstance) dashboardChartInstance.resize(); };
-        window.addEventListener('resize', _cr);
-        if (typeof ResizeObserver !== 'undefined' && canvas.parentElement) {
-            new ResizeObserver(_cr).observe(canvas.parentElement);
-        }
+        window.addEventListener('resize', () => {
+            if (dashboardChartInstance) dashboardChartInstance.resize();
+        });
     }
 }
 
