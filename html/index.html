@@ -51,117 +51,107 @@
     </nav>
 
     <div class="main-content">
-        <div class="hero-panel mb-4">
+        <div class="hero-panel mb-2">
             <div>
-                <p class="hero-eyebrow mb-1">IC Building Network Devices</p>
-                <h3 class="hero-title mb-1">Network Health</h3>
+                <p class="hero-eyebrow mb-0">IC Building Network Devices</p>
+                <h3 class="hero-title mb-0">Network Health</h3>
                 <p class="hero-subtitle mb-0">Monitor core services, reduce downtime, and keep everything connected.</p>
             </div>
         </div>
 
-        <div class="row g-4">
-            <div class="col-md-3">
-                <div class="card p-3 stat-card">
-                    <div class="d-flex justify-content-between align-items-start">
+        <!-- Stat cards -->
+        <div class="row g-2 mb-2">
+            <div class="col-6 col-md-3">
+                <div class="card p-2 stat-card">
+                    <div class="d-flex justify-content-between align-items-center">
                         <div>
-                            <h6 class="stat-label">Total Devices</h6>
-                            <h2 class="mb-0 stat-value" id="total-devices">--</h2>
+                            <div class="stat-label">Total Devices</div>
+                            <div class="stat-value" id="total-devices">--</div>
                         </div><span class="stat-icon stat-icon-primary"><i class="fas fa-network-wired"></i></span>
-                    </div><small class="text-success stat-note"></small>
+                    </div>
                 </div>
             </div>
-            <div class="col-md-3">
-                <div class="card p-3 stat-card">
-                    <div class="d-flex justify-content-between align-items-start">
+            <div class="col-6 col-md-3">
+                <div class="card p-2 stat-card">
+                    <div class="d-flex justify-content-between align-items-center">
                         <div>
-                            <h6 class="stat-label">Online</h6>
-                            <h2 class="mb-0 text-success stat-value" id="online-count">--</h2>
+                            <div class="stat-label">Online</div>
+                            <div class="stat-value text-success" id="online-count">--</div>
                         </div><span class="stat-icon stat-icon-success"><i class="fas fa-check-circle"></i></span>
                     </div>
                 </div>
             </div>
-            <div class="col-md-3">
-                <div class="card p-3 stat-card">
-                    <div class="d-flex justify-content-between align-items-start">
+            <div class="col-6 col-md-3">
+                <div class="card p-2 stat-card">
+                    <div class="d-flex justify-content-between align-items-center">
                         <div>
-                            <h6 class="stat-label">Offline</h6>
-                            <h2 class="mb-0 text-danger stat-value" id="offline-count">--</h2>
+                            <div class="stat-label">Offline</div>
+                            <div class="stat-value text-danger" id="offline-count">--</div>
                         </div><span class="stat-icon stat-icon-danger"><i class="fas fa-times-circle"></i></span>
                     </div>
                 </div>
             </div>
-            <div class="col-md-3">
-                <div class="card p-3 stat-card">
-                    <div class="d-flex justify-content-between align-items-start">
+            <div class="col-6 col-md-3">
+                <div class="card p-2 stat-card">
+                    <div class="d-flex justify-content-between align-items-center">
                         <div>
-                            <h6 class="stat-label">Alerts Today</h6>
-                            <h2 class="mb-0 text-warning stat-value" id="alerts-today">--</h2>
+                            <div class="stat-label">Alerts Today</div>
+                            <div class="stat-value text-warning" id="alerts-today">--</div>
                         </div><span class="stat-icon stat-icon-warning"><i class="fas fa-bell"></i></span>
                     </div>
                 </div>
             </div>
-
-            <div class="col-12 col-lg-5">
-                <div class="card p-3 panel-card">
-                    <h6 class="section-title mb-2">Device Status</h6>
-                    <canvas id="statusChart" height="180"></canvas>
-                </div>
-            </div>
-            <div class="col-12 col-lg-7">
-                <div class="card p-3 panel-card">
-                    <h6 class="section-title">Recent Alerts</h6>
-                    <ul class="list-group list-group-flush" id="recent-alerts"></ul>
-                </div>
-            </div>
         </div>
 
-        <!-- ICMP + ARP panels -->
-        <div class="row g-4 mt-1">
-            <div class="col-12 col-lg-6">
-                <div class="card p-3 panel-card">
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <h6 class="section-title mb-0"><i class="fas fa-satellite-dish me-2 text-info"></i>ICMP Ping Results</h6>
-                        <span class="badge bg-info-subtle text-info border border-info-subtle" id="icmp-count">0 probed</span>
+        <!-- Main 4-column panel row — all visible without scrolling -->
+        <div class="row g-2">
+            <div class="col-12 col-lg-3">
+                <div class="card p-2 panel-card h-100">
+                    <div class="section-title mb-1" style="font-size:0.78rem;">Device Status</div>
+                    <canvas id="statusChart" height="160"></canvas>
+                </div>
+            </div>
+            <div class="col-12 col-lg-3">
+                <div class="card p-2 panel-card h-100">
+                    <div class="section-title mb-1" style="font-size:0.78rem;">Recent Alerts</div>
+                    <div style="overflow-y:auto;max-height:280px;">
+                        <ul class="list-group list-group-flush" id="recent-alerts"></ul>
                     </div>
-                    <p class="text-muted small mb-2" style="font-size:0.75rem;">Live ICMP echo results — reachability and round-trip latency per device.</p>
-                    <div style="max-height:280px;overflow-y:auto;">
+                </div>
+            </div>
+            <div class="col-12 col-lg-3">
+                <div class="card p-2 panel-card h-100">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <div class="section-title mb-0" style="font-size:0.78rem;"><i class="fas fa-satellite-dish me-1 text-info"></i>ICMP Results</div>
+                        <span class="badge bg-info-subtle text-info border border-info-subtle" style="font-size:0.65rem;" id="icmp-count">0</span>
+                    </div>
+                    <p class="text-muted mb-1" style="font-size:0.68rem;">Live echo: reachability + round-trip latency.</p>
+                    <div style="overflow-y:auto;max-height:260px;">
                         <table class="table table-sm table-hover mb-0" id="icmp-table">
-                            <thead class="table-light sticky-top" style="font-size:0.72rem;">
-                                <tr>
-                                    <th>Device</th>
-                                    <th>IP Address</th>
-                                    <th>Status</th>
-                                    <th>Latency</th>
-                                    <th>Last Ping</th>
-                                </tr>
+                            <thead class="table-light" style="font-size:0.67rem;">
+                                <tr><th>Device</th><th>IP</th><th>Status</th><th>Latency</th><th>Time</th></tr>
                             </thead>
                             <tbody id="icmp-tbody">
-                                <tr><td colspan="5" class="text-center text-muted py-3"><i class="fas fa-spinner fa-spin me-1"></i>Waiting for ping stream…</td></tr>
+                                <tr><td colspan="5" class="text-center text-muted py-2" style="font-size:0.72rem;"><i class="fas fa-spinner fa-spin me-1"></i>Waiting…</td></tr>
                             </tbody>
                         </table>
                     </div>
                 </div>
             </div>
-            <div class="col-12 col-lg-6">
-                <div class="card p-3 panel-card">
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <h6 class="section-title mb-0"><i class="fas fa-ethernet me-2 text-success"></i>ARP Table</h6>
-                        <span class="badge bg-success-subtle text-success border border-success-subtle" id="arp-count">0 entries</span>
+            <div class="col-12 col-lg-3">
+                <div class="card p-2 panel-card h-100">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <div class="section-title mb-0" style="font-size:0.78rem;"><i class="fas fa-ethernet me-1 text-success"></i>ARP Table</div>
+                        <span class="badge bg-success-subtle text-success border border-success-subtle" style="font-size:0.65rem;" id="arp-count">0</span>
                     </div>
-                    <p class="text-muted small mb-2" style="font-size:0.75rem;">ARP-resolved entries — IP-to-MAC mappings discovered on the campus subnet.</p>
-                    <div style="max-height:280px;overflow-y:auto;">
+                    <p class="text-muted mb-1" style="font-size:0.68rem;">IP → MAC mappings discovered on campus subnet.</p>
+                    <div style="overflow-y:auto;max-height:260px;">
                         <table class="table table-sm table-hover mb-0" id="arp-table">
-                            <thead class="table-light sticky-top" style="font-size:0.72rem;">
-                                <tr>
-                                    <th>IP Address</th>
-                                    <th>MAC Address</th>
-                                    <th>Device Type</th>
-                                    <th>Name</th>
-                                    <th>Last Seen</th>
-                                </tr>
+                            <thead class="table-light" style="font-size:0.67rem;">
+                                <tr><th>IP</th><th>MAC</th><th>Type</th><th>Name</th><th>Last Seen</th></tr>
                             </thead>
                             <tbody id="arp-tbody">
-                                <tr><td colspan="5" class="text-center text-muted py-3"><i class="fas fa-spinner fa-spin me-1"></i>Loading ARP entries…</td></tr>
+                                <tr><td colspan="5" class="text-center text-muted py-2" style="font-size:0.72rem;"><i class="fas fa-spinner fa-spin me-1"></i>Loading…</td></tr>
                             </tbody>
                         </table>
                     </div>
