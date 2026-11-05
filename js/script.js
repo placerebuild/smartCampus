@@ -804,14 +804,20 @@ function populateRecentAlerts() {
     const list = document.getElementById('recent-alerts');
     if (!list) return;
 
-    list.innerHTML = alertsData.map(a => `
-        <li class="list-group-item d-flex justify-content-between align-items-center">
+    list.innerHTML = alertsData.map(a => {
+        const severityClass = a.severity === 'High' || a.severity === 'danger' ? 'danger' : a.severity === 'warning' || a.severity === 'Warning' ? 'warning' : 'success';
+        const severityLabel = a.severity === 'danger' ? 'High' : a.severity === 'warning' ? 'Warning' : (a.severity || 'Info');
+        return `
+        <li class="list-group-item d-flex justify-content-between align-items-start">
             <div>
-                <strong>${a.device}</strong> - ${a.issue}
-                <br><small class="text-muted">${a.time}</small>
+                <strong>${a.device}</strong>
+                <br><span class="text-danger small"><i class="fas fa-exclamation-circle me-1"></i>${a.issue || 'Alert triggered'}</span>
+                ${a.location ? `<br><small class="text-muted"><i class="fas fa-map-marker-alt me-1"></i>${a.location}</small>` : ''}
+                <br><small class="text-muted"><i class="far fa-clock me-1"></i>${new Date(a.time).toLocaleString()}</small>
             </div>
-            <span class="badge bg-${a.severity === 'High' ? 'danger' : 'warning'}">${a.severity}</span>
-        </li>`).join('');
+            <span class="badge bg-${severityClass} ms-2 mt-1" style="white-space:nowrap;">${severityLabel}</span>
+        </li>`;
+    }).join('');
 }
 
 async function populateAlertsTable() {
@@ -2747,13 +2753,16 @@ function populateDashboardAlerts(devices) {
 
     list.innerHTML = offlineDevices.slice(0, 8).map(d => {
         const time = d.lastSeen ? d.lastSeen : 'Unknown';
+        const loc = d.location || [d.building, d.floor, d.room].filter(Boolean).join(' / ');
         return `
-        <li class="list-group-item d-flex justify-content-between align-items-center">
+        <li class="list-group-item d-flex justify-content-between align-items-start">
             <div>
-                <strong>${d.name || d.ip}</strong> - Device unreachable
-                <br><small class="text-muted">${time}</small>
+                <strong>${d.name || d.ip}</strong>
+                <br><span class="text-danger small"><i class="fas fa-exclamation-circle me-1"></i>Device unreachable</span>
+                ${loc ? `<br><small class="text-muted"><i class="fas fa-map-marker-alt me-1"></i>${loc}</small>` : ''}
+                <br><small class="text-muted"><i class="far fa-clock me-1"></i>${time}</small>
             </div>
-            <span class="badge bg-danger">Offline</span>
+            <span class="badge bg-danger ms-2 mt-1">Offline</span>
         </li>`;
     }).join('');
 }
@@ -3082,6 +3091,7 @@ function showAlertToast(alert) {
             <div class="toast-body fw-semibold" style="font-size:0.9rem;">
                 ${alert.message || 'Alert triggered.'}
                 ${alert.deviceName ? `<div class="text-muted small mt-1"><i class="fas fa-server me-1"></i>${alert.deviceName}</div>` : ''}
+                ${alert.location ? `<div class="text-muted small mt-1"><i class="fas fa-map-marker-alt me-1"></i>${alert.location}</div>` : ''}
             </div>
         </div>
     `;
@@ -3102,14 +3112,14 @@ function showAlertToast(alert) {
     if (recentAlerts) {
         const timeStr = new Date(alert.time).toLocaleTimeString();
         const alertHtml = `
-            <li class="list-group-item px-0 py-3">
-                <div class="d-flex justify-content-between align-items-start">
-                    <div class="ms-2 me-auto">
-                        <div class="fw-bold mb-1">${alert.message}</div>
-                        <span class="badge bg-${alert.severity} me-1">${alert.type.toUpperCase()}</span>
-                        <small class="text-muted"><i class="far fa-clock me-1"></i>${timeStr}</small>
-                    </div>
+            <li class="list-group-item d-flex justify-content-between align-items-start">
+                <div>
+                    <strong>${alert.deviceName || 'Unknown'}</strong>
+                    <br><span class="text-danger small"><i class="fas fa-exclamation-circle me-1"></i>${alert.message}</span>
+                    ${alert.location ? `<br><small class="text-muted"><i class="fas fa-map-marker-alt me-1"></i>${alert.location}</small>` : ''}
+                    <br><small class="text-muted"><i class="far fa-clock me-1"></i>${timeStr}</small>
                 </div>
+                <span class="badge bg-${alert.severity} ms-2 mt-1" style="white-space:nowrap;">${alert.type ? alert.type.toUpperCase() : 'ALERT'}</span>
             </li>
         `;
         recentAlerts.insertAdjacentHTML('afterbegin', alertHtml);

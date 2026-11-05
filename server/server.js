@@ -1627,7 +1627,12 @@ async function runContinuousPingSweep() {
   continuousPingInFlight = true;
 
   try {
-    const [rows] = await dbPool.execute("SELECT \"DeviceID\", \"IPAddress\", \"DeviceName\", \"Status\" FROM \"DEVICE\"");
+    const [rows] = await dbPool.execute(
+      `SELECT d."DeviceID", d."IPAddress", d."DeviceName", d."Status",
+              l."BuildingName", l."Floor", l."Room"
+       FROM "DEVICE" d
+       LEFT JOIN "LOCATION" l ON l."LocationID" = d."LocationID"`
+    );
     if (!rows || rows.length === 0) return;
 
     // Three-stage alert pipeline — prevents false TSSU notifications from transient outages:
@@ -1693,7 +1698,7 @@ async function runContinuousPingSweep() {
               emitAlertEvent({
                 type: 'abnormal', severity: 'warning', stage: 'warn',
                 message: warnLatMsg, deviceId: device.DeviceID,
-                deviceName: device.DeviceName || target, time: new Date().toISOString()
+                deviceName: device.DeviceName || target, location: formatLocationLabel(device), time: new Date().toISOString()
               });
               insertAlert('abnormal', 'warning', warnLatMsg, device.DeviceID);
             }
@@ -1707,7 +1712,7 @@ async function runContinuousPingSweep() {
               emitAlertEvent({
                 type: 'abnormal', severity: 'danger', stage: 'critical',
                 message: critLatMsg, deviceId: device.DeviceID,
-                deviceName: device.DeviceName || target, time: new Date().toISOString()
+                deviceName: device.DeviceName || target, location: formatLocationLabel(device), time: new Date().toISOString()
               });
               insertAlert('abnormal', 'danger', critLatMsg, device.DeviceID);
               sendAlertEmail('abnormal', 'danger', critLatMsg, device.DeviceName || target, device.DeviceID);
@@ -1740,7 +1745,7 @@ async function runContinuousPingSweep() {
             emitAlertEvent({
               type: 'recovery', severity: 'success', stage: 'resolved',
               message: recoveryMsg, deviceId: device.DeviceID,
-              deviceName: device.DeviceName || target, time: new Date().toISOString()
+              deviceName: device.DeviceName || target, location: formatLocationLabel(device), time: new Date().toISOString()
             });
             insertAlert('recovery', 'success', recoveryMsg, device.DeviceID);
             sendAlertEmail('recovery', 'success', recoveryMsg, device.DeviceName || target, device.DeviceID);
@@ -1769,7 +1774,7 @@ async function runContinuousPingSweep() {
           emitAlertEvent({
             type: 'downtime', severity: 'warning', stage: 'warn',
             message: warnMsg, deviceId: device.DeviceID,
-            deviceName: device.DeviceName || target, time: new Date().toISOString()
+            deviceName: device.DeviceName || target, location: formatLocationLabel(device), time: new Date().toISOString()
           });
           insertAlert('downtime', 'warning', warnMsg, device.DeviceID);
         }
@@ -1801,7 +1806,7 @@ async function runContinuousPingSweep() {
             emitAlertEvent({
               type: 'downtime', severity: 'danger', stage: 'critical',
               message: critMsg, deviceId: device.DeviceID,
-              deviceName: device.DeviceName || target, time: new Date().toISOString()
+              deviceName: device.DeviceName || target, location: formatLocationLabel(device), time: new Date().toISOString()
             });
             insertAlert('downtime', 'danger', critMsg, device.DeviceID);
             sendAlertEmail('downtime', 'danger', critMsg, device.DeviceName || target, device.DeviceID);
@@ -2116,9 +2121,11 @@ app.get('/api/alerts', requireAuth, async (req, res) => {
       `SELECT a."AlertID", a."AlertType", a."Severity", a."Issue", a."Timestamp",
               a."IsResolved", a."ResolvedAt", a."ResolutionNotes",
               d."DeviceName", d."IPAddress",
+              l."BuildingName", l."Floor", l."Room",
               u."FullName" AS "ResolvedBy"
        FROM "ALERT" a
        LEFT JOIN "DEVICE" d ON d."DeviceID" = a."DeviceID"
+       LEFT JOIN "LOCATION" l ON l."LocationID" = d."LocationID"
        LEFT JOIN "USERS" u ON u."UserID" = a."ResolvedByUserID"
        ORDER BY a."Timestamp" DESC
        LIMIT 100`
@@ -2130,6 +2137,7 @@ app.get('/api/alerts', requireAuth, async (req, res) => {
       device: r.DeviceName || r.IPAddress || 'Unknown',
       issue: r.Issue,
       time: r.Timestamp,
+      location: formatLocationLabel(r),
       resolved: Boolean(r.IsResolved),
       resolvedAt: r.ResolvedAt || null,
       resolvedBy: r.ResolvedBy || null,
