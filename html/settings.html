@@ -55,7 +55,7 @@
                 </div>
             </div>
         </div>
-        <div class="card panel-card p-4">
+        <div class="card panel-card p-4 mb-3">
             <h6 class="section-title">Security</h6>
             <div class="row g-3">
                 <div class="col-md-6"><label class="form-label">Current Password</label><input type="password"
@@ -65,7 +65,124 @@
                 <div class="col-12"><button class="btn btn-primary" type="button">Update Settings</button></div>
             </div>
         </div>
+        <div class="card panel-card p-4">
+            <h6 class="section-title">Data Retention</h6>
+            <p class="text-muted small mb-3">Remove stale device records and history logs. Deleting a device also removes its scan history, connection records, and alerts.</p>
+
+            <!-- Device Records -->
+            <div class="mb-4">
+                <label class="form-label fw-semibold"><i class="fas fa-network-wired me-1 text-primary"></i>Device Records</label>
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <span class="text-muted small">Remove devices not seen in the last</span>
+                    <select class="form-select form-select-sm" id="dr-devices-days" style="width:auto;" onchange="drPreview('devices')">
+                        <option value="7">7 days</option>
+                        <option value="14">14 days</option>
+                        <option value="30" selected>30 days</option>
+                        <option value="90">90 days</option>
+                        <option value="0">All time (clear all)</option>
+                    </select>
+                    <span id="dr-devices-preview" class="badge bg-secondary small" style="font-weight:500;"></span>
+                    <button class="btn btn-sm btn-outline-danger" onclick="drPurge('devices')" id="dr-devices-btn">
+                        <i class="fas fa-trash-alt me-1"></i>Purge
+                    </button>
+                </div>
+                <div id="dr-devices-msg" class="mt-1 small"></div>
+            </div>
+
+            <!-- Scan History Logs -->
+            <div class="mb-4">
+                <label class="form-label fw-semibold"><i class="fas fa-history me-1 text-primary"></i>Scan History Logs</label>
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <span class="text-muted small">Remove log entries older than</span>
+                    <select class="form-select form-select-sm" id="dr-logs-days" style="width:auto;" onchange="drPreview('logs')">
+                        <option value="7">7 days</option>
+                        <option value="14">14 days</option>
+                        <option value="30" selected>30 days</option>
+                        <option value="90">90 days</option>
+                    </select>
+                    <span id="dr-logs-preview" class="badge bg-secondary small" style="font-weight:500;"></span>
+                    <button class="btn btn-sm btn-outline-danger" onclick="drPurge('logs')" id="dr-logs-btn">
+                        <i class="fas fa-trash-alt me-1"></i>Purge Logs
+                    </button>
+                </div>
+                <div id="dr-logs-msg" class="mt-1 small"></div>
+            </div>
+
+            <!-- Scan Sessions -->
+            <div>
+                <label class="form-label fw-semibold"><i class="fas fa-search me-1 text-primary"></i>Scan Session History</label>
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <span class="text-muted small">Remove scan sessions older than</span>
+                    <select class="form-select form-select-sm" id="dr-scansessions-days" style="width:auto;" onchange="drPreview('scansessions')">
+                        <option value="7">7 days</option>
+                        <option value="14">14 days</option>
+                        <option value="30" selected>30 days</option>
+                        <option value="90">90 days</option>
+                        <option value="0">All time (clear all)</option>
+                    </select>
+                    <span id="dr-scansessions-preview" class="badge bg-secondary small" style="font-weight:500;"></span>
+                    <button class="btn btn-sm btn-outline-danger" onclick="drPurge('scansessions')" id="dr-scansessions-btn">
+                        <i class="fas fa-trash-alt me-1"></i>Purge Sessions
+                    </button>
+                </div>
+                <div id="dr-scansessions-msg" class="mt-1 small"></div>
+            </div>
+        </div>
     </div>
+
+    <script>
+    (function () {
+        async function drPreview(target) {
+            const days = Number(document.getElementById('dr-' + target + '-days').value);
+            const badge = document.getElementById('dr-' + target + '-preview');
+            badge.textContent = '…';
+            try {
+                const r = await fetch('/api/devices/purge/preview?target=' + target + '&olderThanDays=' + days, { credentials: 'include' });
+                const d = await r.json();
+                badge.textContent = d.count + ' record' + (d.count !== 1 ? 's' : '');
+                badge.className = 'badge small ' + (d.count > 0 ? 'bg-danger' : 'bg-secondary');
+            } catch { badge.textContent = '?'; }
+        }
+
+        async function drPurge(target) {
+            const days = Number(document.getElementById('dr-' + target + '-days').value);
+            const badge = document.getElementById('dr-' + target + '-preview');
+            const count = badge ? parseInt(badge.textContent) : '?';
+            const label = { devices: 'device record', logs: 'scan log entry', scansessions: 'scan session' }[target] || 'record';
+            const msg = days > 0
+                ? `Remove ${count} ${label}(s) older than ${days} days?`
+                : `Remove ALL ${label}s? This cannot be undone.`;
+            if (!confirm(msg)) return;
+            const btn = document.getElementById('dr-' + target + '-btn');
+            const msgEl = document.getElementById('dr-' + target + '-msg');
+            btn.disabled = true;
+            try {
+                const r = await fetch('/api/devices/purge', {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ target, olderThanDays: days })
+                });
+                const d = await r.json();
+                if (d.ok) {
+                    msgEl.innerHTML = '<span class="text-success"><i class="fas fa-check me-1"></i>Removed ' + d.affected + ' ' + label + (d.affected !== 1 ? 's' : '') + '.</span>';
+                    drPreview(target);
+                } else {
+                    msgEl.innerHTML = '<span class="text-danger"><i class="fas fa-exclamation-triangle me-1"></i>' + (d.error || 'Purge failed.') + '</span>';
+                }
+            } catch { msgEl.innerHTML = '<span class="text-danger">Network error.</span>'; }
+            btn.disabled = false;
+        }
+
+        window.drPreview = drPreview;
+        window.drPurge = drPurge;
+
+        // Load initial previews once the page auth is ready
+        window.addEventListener('DOMContentLoaded', function () {
+            setTimeout(function () { drPreview('devices'); drPreview('logs'); drPreview('scansessions'); }, 1200);
+        });
+    })();
+    </script>
     <script>window.pageRequiredRole = 'Admin';</script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/cytoscape@3.30.2/dist/cytoscape.min.js"></script>

@@ -2237,6 +2237,100 @@ app.post('/api/devices/cleanup-blacklisted', requireAuth, async (req, res) => {
   }
 });
 
+// Preview how many records would be affected by a purge
+app.get('/api/devices/purge/preview', requireAuth, requireRole('Admin'), async (req, res) => {
+  const { target, olderThanDays } = req.query;
+  try {
+    const days = Number(olderThanDays);
+    if (target === 'devices') {
+      let rows;
+      if (!days || days <= 0) {
+        [rows] = await dbPool.execute('SELECT COUNT(*) AS cnt FROM "DEVICE"');
+      } else {
+        [rows] = await dbPool.execute(
+          `SELECT COUNT(*) AS cnt FROM "DEVICE" WHERE "LastSeen" < NOW() - ($1 * INTERVAL '1 day') OR "LastSeen" IS NULL`,
+          [days]
+        );
+      }
+      return res.json({ count: Number(rows[0].cnt) });
+    }
+    if (target === 'logs') {
+      if (!days || days < 1) return res.status(400).json({ error: 'olderThanDays required for log preview.' });
+      const [rows] = await dbPool.execute(
+        `SELECT COUNT(*) AS cnt FROM "DEVICE_LOG" WHERE "CreatedAt" < NOW() - ($1 * INTERVAL '1 day')`,
+        [days]
+      );
+      return res.json({ count: Number(rows[0].cnt) });
+    }
+    if (target === 'scansessions') {
+      let rows;
+      if (!days || days <= 0) {
+        [rows] = await dbPool.execute('SELECT COUNT(*) AS cnt FROM "SCAN_SESSION"');
+      } else {
+        [rows] = await dbPool.execute(
+          `SELECT COUNT(*) AS cnt FROM "SCAN_SESSION" WHERE "StartedAt" < NOW() - ($1 * INTERVAL '1 day')`,
+          [days]
+        );
+      }
+      return res.json({ count: Number(rows[0].cnt) });
+    }
+    res.status(400).json({ error: 'Invalid target.' });
+  } catch (err) {
+    console.error('GET /api/devices/purge/preview error:', err);
+    res.status(500).json({ error: 'Preview failed.' });
+  }
+});
+
+// Purge device records, scan logs, or scan sessions
+app.post('/api/devices/purge', requireAuth, requireRole('Admin'), async (req, res) => {
+  const { target, olderThanDays } = req.body || {};
+  try {
+    const days = Number(olderThanDays);
+    if (target === 'devices') {
+      let result;
+      if (!days || days <= 0) {
+        [result] = await dbPool.execute('DELETE FROM "DEVICE" WHERE 1=1');
+      } else {
+        [result] = await dbPool.execute(
+          `DELETE FROM "DEVICE" WHERE "LastSeen" < NOW() - ($1 * INTERVAL '1 day') OR "LastSeen" IS NULL`,
+          [days]
+        );
+      }
+      const affected = result.rowCount ?? result.affectedRows ?? 0;
+      logActivity(req, 'purge_devices', `Removed ${affected} device(s) not seen in ${days || 'all time'}`);
+      return res.json({ ok: true, affected });
+    }
+    if (target === 'logs') {
+      if (!days || days < 1) return res.status(400).json({ error: 'olderThanDays must be >= 1 for log purge.' });
+      const [result] = await dbPool.execute(
+        `DELETE FROM "DEVICE_LOG" WHERE "CreatedAt" < NOW() - ($1 * INTERVAL '1 day')`,
+        [days]
+      );
+      const affected = result.rowCount ?? result.affectedRows ?? 0;
+      logActivity(req, 'purge_device_logs', `Removed ${affected} device log entry(s) older than ${days} days`);
+      return res.json({ ok: true, affected });
+    }
+    if (target === 'scansessions') {
+      let result;
+      if (!days || days <= 0) {
+        [result] = await dbPool.execute('DELETE FROM "SCAN_SESSION" WHERE 1=1');
+      } else {
+        [result] = await dbPool.execute(
+          `DELETE FROM "SCAN_SESSION" WHERE "StartedAt" < NOW() - ($1 * INTERVAL '1 day')`,
+          [days]
+        );
+      }
+      const affected = result.rowCount ?? result.affectedRows ?? 0;
+      logActivity(req, 'purge_scan_sessions', `Removed ${affected} scan session(s)`);
+      return res.json({ ok: true, affected });
+    }
+    res.status(400).json({ error: 'Invalid target. Use devices, logs, or scansessions.' });
+  } catch (err) {
+    console.error('POST /api/devices/purge error:', err);
+    res.status(500).json({ error: 'Purge failed.' });
+  }
+});
+
 // Update a device details (name, type, building, floor, room)
 app.put('/api/devices/:deviceId/location', requireAuth, async (req, res) => {
   const deviceId = Number(req.params.deviceId);
