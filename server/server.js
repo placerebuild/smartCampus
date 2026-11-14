@@ -2223,7 +2223,7 @@ app.delete('/api/devices/:deviceId', requireAuth, requireRole('Admin'), async (r
 });
 
 // Bulk-remove all devices whose IPs match the blacklist (multicast IPs from Windows ARP table)
-app.post('/api/devices/cleanup-blacklisted', requireAuth, async (req, res) => {
+app.post('/api/devices/cleanup-blacklisted', requireAuth, requireRole('Admin'), async (req, res) => {
   try {
     const [allDevices] = await dbPool.execute("SELECT \"DeviceID\", \"IPAddress\" FROM \"DEVICE\"");
     const toDelete = allDevices.filter(d => isBlacklistedIp(d.IPAddress));
